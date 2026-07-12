@@ -1,0 +1,7 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+const anchors=[['verification-layer','Logic'],['platform','Align'],['source-truth','Source'],['evidence-proof','Proof'],['workflow','System'],['action-routing','Action'],['use-cases','Evidence']];
+
+export function MarketingReveal(){const[active,setActive]=useState(0);useEffect(()=>{const pageRoot=document.documentElement;const sections=[...document.querySelectorAll<HTMLElement>('[data-reveal]')];const scrollRoot=window.matchMedia('(min-width: 901px)').matches?document.querySelector<HTMLElement>('main.buili-marketing'):null;pageRoot.classList.add('reveal-ready');const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduced){sections.forEach(section=>section.classList.add('is-visible'));return()=>pageRoot.classList.remove('reveal-ready')}const observer=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('is-visible');const id=(entry.target as HTMLElement).id;const index=anchors.findIndex(([anchor])=>anchor===id);if(index>=0)setActive(index)}else entry.target.classList.remove('is-visible')})},{root:scrollRoot,threshold:.12,rootMargin:'-8% 0px -20%'});sections.forEach(section=>observer.observe(section));return()=>{observer.disconnect();pageRoot.classList.remove('reveal-ready')}},[]);return <nav className="marketing-progress" aria-label="Page sections">{anchors.map(([href,label],index)=><a key={href} href={`#${href}`} className={index===active?'active':''}><span>{label}</span><i/></a>)}</nav>}

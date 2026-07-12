@@ -1,0 +1,7 @@
+# Install only in workers that need these adapters. None are required for the
+# deterministic PlanGraph/GLB contract.
+mutagen>=1.47,<2
+openai>=1.60,<3
+easyocr>=1.7,<2
+torch>=2.4,<3
+transformers>=4.46,<6

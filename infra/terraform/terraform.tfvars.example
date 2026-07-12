@@ -1,0 +1,15 @@
+# Copy to a protected production.tfvars file. No secret values belong here.
+certificate_arn = "arn:aws:acm:us-west-1:123456789012:certificate/replace-me"
+image_tag       = "replace-with-git-sha"
+
+api_hostname  = "api.builiconstruction.com"
+public_api_url = "https://api.builiconstruction.com"
+frontend_url   = "https://app.builiconstruction.com"
+allowed_origins = "https://app.builiconstruction.com"
+
+# Keep disabled until the project has approved external processing and the
+# Secrets Manager JSON contains a new project-scoped OPENAI_API_KEY.
+external_ai_enabled = false
+
+# Optional. The subscription does not receive alerts until it is confirmed.
+alarm_email = ""

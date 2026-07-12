@@ -1,0 +1,27 @@
+'use client';
+import Link from 'next/link';
+import { ArrowRight, CheckCircle2, ChevronDown, Clock3, Download, FileQuestion, ListFilter, Plus, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { PageHeader } from '@/components/page-header';
+import { useWorkspace } from '@/components/demo-mode';
+import { StatusPill } from '@/components/status-pill';
+import { api } from '@/lib/api';
+
+const work = [
+  ['P-024','Raise garage GFCI receptacle to 18 in. AFF','Punch item','Delta Electrical','Ready for review','Jul 14'],
+  ['RFI-017','HVAC route at Level 2 north corridor','RFI','Axis Mechanical','Awaiting response','Jul 13'],
+  ['CE-008','Existing plumbing at new footing','Change event','Northstar Builders','Evidence collecting','Jul 16'],
+  ['MU-011','Update model from approved RFI-014','Model update','VDC team','In progress','Jul 15'],
+  ['P-021','Correct partition offset at west corridor','Punch item','FrameWorks','Open','Jul 17']
+];
+
+export default function WorkflowsPage(){const{demo,projectId}=useWorkspace();if(!demo)return <LiveActions projectId={projectId}/>;return <div className="page-pad"><PageHeader title="Project actions" description="Human-reviewed RFIs, punch items, change evidence, and model updates created from verified issues." actions={<><button className="button button--secondary"><Download size={14}/> Export log</button><button className="button button--primary"><Plus size={14}/> New action</button></>}/>
+  <div className="workflow-kpis"><div><FileQuestion/><span><b>03</b> open RFIs</span><small>Median response · 2.4 days</small></div><div><CheckCircle2/><span><b>11</b> punch items</span><small>73% closed this week</small></div><div><Clock3/><span><b>04</b> change events</span><small>$28.4k potential impact</small></div><div><ArrowRight/><span><b>02</b> model updates</span><small>Oldest pending · 2 days</small></div></div>
+  <div className="document-tabs"><button className="active">All actions</button><button>RFIs</button><button>Punch</button><button>Change events</button><button>Model updates</button></div>
+  <div className="filter-row"><div className="table-search"><Search/><input placeholder="Search project actions"/></div><button className="filter-button"><ListFilter/> All statuses</button><button className="filter-button">All assignees <ChevronDown/></button></div>
+  <div className="table-scroll"><table className="data-table"><thead><tr><th>Reference</th><th>Title</th><th>Action</th><th>Responsible</th><th>Status</th><th>Due</th><th/></tr></thead><tbody>{work.map(row=><tr key={row[0]}><td className="cell-id">{row[0]}</td><td className="cell-title"><Link href={row[0]==='P-024'?'/app/issues/BUI-1042?demo=1':'/app/workflows'}>{row[1]}</Link></td><td>{row[2]}</td><td className="cell-muted">{row[3]}</td><td><StatusPill tone={row[4]==='Ready for review'?'green':row[4]==='Awaiting response'?'blue':row[4]==='Evidence collecting'?'amber':'neutral'}>{row[4]}</StatusPill></td><td className="cell-muted">{row[5]}</td><td><button className="icon-button">•••</button></td></tr>)}</tbody></table></div>
+  <section className="routing-explainer"><div><span>BUILI action router</span><h2>Not every field observation should become an RFI.</h2><p>BUILI distinguishes a clear field correction from a design question, change event, progress record, or model update—then preserves why that route was selected.</p></div><div className="route-flow"><span>Observation</span><i/><span>Requirement</span><i/><span>Evidence check</span><i/><strong>Right action</strong></div></section>
+ </div>}
+
+type LiveIssue={id:string;number:string;title:string;recommended_action:string;status:string;assigned_to:string|null;updated_at:string};
+function LiveActions({projectId}:{projectId:string}){const[rows,setRows]=useState<LiveIssue[]>([]);const[error,setError]=useState('');useEffect(()=>{if(!projectId||['loading','none'].includes(projectId))return;let active=true;api.get<LiveIssue[]>(`/projects/${projectId}/issues`).then(data=>{if(active)setRows(data.filter(item=>item.recommended_action&&item.recommended_action!=='additional_evidence_required'))}).catch(cause=>{if(active)setError(cause instanceof Error?cause.message:'Project actions could not be loaded.')});return()=>{active=false}},[projectId]);return <div className="page-pad"><PageHeader title="Project actions" description="Human-reviewed RFIs, punch items, change evidence, and model updates created from verified issues."/>{error&&<p className="inline-error">{error}</p>}<div className="table-scroll"><table className="data-table"><thead><tr><th>Issue</th><th>Title</th><th>Recommended action</th><th>Status</th><th>Assigned to</th><th>Updated</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}><td className="cell-id">{row.number}</td><td className="cell-title"><Link href={`/app/issues/${row.id}`}>{row.title}</Link></td><td>{row.recommended_action.replaceAll('_',' ')}</td><td><StatusPill tone={row.status.includes('review')?'green':'neutral'}>{row.status.replaceAll('_',' ')}</StatusPill></td><td className="cell-muted">{row.assigned_to||'Unassigned'}</td><td className="cell-muted">{new Date(row.updated_at).toLocaleString()}</td></tr>)}</tbody></table></div>{rows.length===0&&!error&&<div className="live-placeholder"><FileQuestion/><p><b>No routed actions yet.</b><span>Analyze a verified issue to recommend the appropriate project action.</span></p></div>}</div>}

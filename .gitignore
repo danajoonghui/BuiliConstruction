@@ -1,0 +1,52 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Runtime data and generated artifacts
+.buili/
+.data/
+uploads/
+storage/
+tmp/
+plan_graph.json
+logs/
+*-qa.png
+*.sqlite3
+*.db
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Infrastructure state
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log

@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "buili-construction-web",
+  "main": ".open-next/worker.js",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "builiconstruction.com", "custom_domain": true },
+    { "pattern": "www.builiconstruction.com", "custom_domain": true }
+  ],
+  "compatibility_date": "2026-07-12",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

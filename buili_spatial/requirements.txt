@@ -1,0 +1,8 @@
+# Core spatial runtime (CPU-first). Pin exact versions in the deployment lockfile.
+pydantic>=2.8,<3
+numpy>=1.26,<3
+Pillow>=10.3,<13
+PyMuPDF>=1.24,<2
+Shapely>=2.0,<3
+opencv-python-headless>=4.10,<5
+fastapi>=0.115,<1

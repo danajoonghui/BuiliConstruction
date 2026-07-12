@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0",
+  "demo_only": true,
+  "organization": {
+    "name": "Northstar Builders",
+    "slug": "northstar-builders"
+  },
+  "user": {
+    "name": "Jordan Cho",
+    "email": "jordan@demo.builiconstruction.com",
+    "role": "PROJECT_MANAGER"
+  },
+  "project": {
+    "name": "Cooper Residence Renovation",
+    "code": "CR-2026-017",
+    "type": "RESIDENTIAL_RENOVATION",
+    "status": "ACTIVE"
+  },
+  "field_reporter": {
+    "name": "Mike Alvarez",
+    "role": "FOREMAN",
+    "company": "Northstar Builders"
+  },
+  "documents": [
+    {
+      "file": "cooper-residence-E1.1-demo.pdf",
+      "type": "DRAWING",
+      "sheet_number": "E1.1",
+      "revision": "2",
+      "status": "CURRENT_APPROVED",
+      "synthetic": true
+    }
+  ],
+  "issue": {
+    "number": "BUI-1042",
+    "title": "Garage GFCI receptacle below required elevation",
+    "discipline": "ELECTRICAL",
+    "location": "Garage · East wall · Entry door",
+    "observed_condition": "The GFCI receptacle centerline measures 12 inches above finished floor.",
+    "required_condition": "E1.1 Electrical Note 3 requires garage receptacles to be mounted at a minimum of 18 inches above finished floor.",
+    "difference": "The installed box centerline is 6 inches below the documented minimum.",
+    "classification": "UNAPPROVED_DEVIATION",
+    "evidence_sufficiency": "SUFFICIENT",
+    "recommended_action": "FIELD_CORRECTION_PUNCH",
+    "secondary_action": "OPTIONAL_DESIGNER_CLARIFICATION",
+    "status": "READY_FOR_REVIEW"
+  },
+  "evidence": [
+    {
+      "file": "garage-east-wall-context.png",
+      "type": "PHOTO",
+      "purpose": "ROOM_CONTEXT"
+    },
+    {
+      "file": "box-elevation-measurement.png",
+      "type": "PHOTO_MEASUREMENT",
+      "purpose": "DIMENSION_PROOF",
+      "measurement": {
+        "value": 12,
+        "unit": "inch",
+        "reference": "AFF"
+      }
+    },
+    {
+      "file": "receptacle-rough-in-detail.png",
+      "type": "PHOTO",
+      "purpose": "INSTALLATION_DETAIL"
+    },
+    {
+      "file": "foreman-voice-note.mp3",
+      "transcript": "foreman-voice-note.vtt",
+      "type": "VOICE_NOTE",
+      "purpose": "FIELD_OBSERVATION"
+    }
+  ],
+  "reports": [
+    {
+      "file": "BUI-1042-issue-package.pdf",
+      "type": "ISSUE_PACKAGE",
+      "status": "READY_FOR_REVIEW",
+      "synthetic": true
+    }
+  ]
+}

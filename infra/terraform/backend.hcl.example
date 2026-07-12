@@ -1,0 +1,6 @@
+# Copy this file outside the repository as backend.hcl.
+# The bucket must already exist with public access blocked, versioning enabled,
+# and encryption configured. Do not put AWS credentials in this file.
+bucket = "replace-with-production-terraform-state-bucket"
+key    = "buili/production/terraform.tfstate"
+region = "us-west-1"

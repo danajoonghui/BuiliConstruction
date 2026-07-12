@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: buili
+      POSTGRES_USER: buili
+      POSTGRES_PASSWORD: local-buili-password
+    ports: ["5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buili -d buili"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: buili-local
+      MINIO_ROOT_PASSWORD: buili-local-secret
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio_data:/data"]
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on: [minio]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 buili-local buili-local-secret; do sleep 1; done;
+        mc mb --ignore-existing local/buili-local;
+        mc anonymous set none local/buili-local;
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:latest
+    ports: ["9324:9324", "9325:9325"]
+
+  clamav:
+    image: clamav/clamav:1.4
+    ports: ["3310:3310"]
+    healthcheck:
+      test: ["CMD-SHELL", "echo PING | nc 127.0.0.1 3310 | grep PONG"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      BUILI_ENVIRONMENT: development
+      BUILI_DATABASE_URL: postgresql+asyncpg://buili:local-buili-password@postgres:5432/buili
+      BUILI_AUTO_CREATE_SCHEMA: "true"
+      BUILI_PUBLIC_API_URL: http://localhost:8000
+      BUILI_JWT_SECRET: local-compose-secret-change-before-deploy
+      BUILI_STORAGE_BACKEND: s3
+      BUILI_S3_BUCKET: buili-local
+      BUILI_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: buili-local
+      AWS_SECRET_ACCESS_KEY: buili-local-secret
+      BUILI_JOB_BACKEND: local
+      BUILI_MALWARE_SCANNER_BACKEND: clamav
+      BUILI_CLAMAV_HOST: clamav
+      BUILI_CLAMAV_PORT: "3310"
+      BUILI_DEMO_MODE: "true"
+      BUILI_DEMO_EVIDENCE_PATH: /demo-evidence
+    ports: ["8000:8000"]
+    volumes:
+      - ../buili_demo_evidence:/demo-evidence:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+      clamav: {condition: service_healthy}
+
+volumes:
+  postgres_data:
+  minio_data:

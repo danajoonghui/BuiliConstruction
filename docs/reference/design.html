@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BUILI — Construction Verification Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --bg-canvas:#F7F9F8;
+    --bg-subtle:#F5F6F5;
+    --bg-global:#161C18;
+
+    --green:#146C48;
+    --green-hover:#0E5738;
+    --green-tint:#EAF3EE;
+
+    --text:#1B211D;
+    --text-secondary:#707B75;
+    --text-tertiary:#9BA49E;
+    --line:#E3E8E5;
+    --line-strong:#CDD6D0;
+
+    --amber:#8A5B00;
+    --amber-tint:#FBF2DE;
+    --red:#A23B34;
+    --red-tint:#FAEBE9;
+    --blue:#345E82;
+    --blue-tint:#EAF1F7;
+
+    /* discipline color coding, following standard CAD/BIM layer conventions */
+    --d-arch:#5B6763;
+    --d-mech:#3F8F7C;
+    --d-elec:#B08900;
+    --d-fp:#9C4A3A;
+
+    --radius:3px;
+    --radius-md:4px;
+    --font-ui:'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:var(--font-ui);
+    color:var(--text);
+    background:var(--bg);
+    font-size:13px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select{font-family:inherit;font-size:inherit;color:inherit;}
+  button{cursor:pointer;background:none;border:none;}
+  ul{list-style:none;}
+  a{color:inherit;text-decoration:none;}
+  svg{display:block;flex-shrink:0;}
+  ::selection{background:var(--green-tint);}
+
+  /* ================= GLOBAL BAR ================= */
+  .global-bar{
+    height:34px;background:var(--bg-global);color:#fff;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 12px;flex-shrink:0;
+  }
+  .global-left{display:flex;align-items:center;gap:9px;}
+  .global-mark{opacity:.95;}
+  .global-name{font-size:12.5px;font-weight:600;letter-spacing:.01em;}
+  .global-sep{color:rgba(255,255,255,.3);font-size:12px;}
+  .global-project{font-size:12px;color:rgba(255,255,255,.62);}
+  .global-right{display:flex;align-items:center;gap:4px;}
+  .global-icon-btn{
+    width:26px;height:26px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;
+    color:rgba(255,255,255,.62);
+  }
+  .global-icon-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .global-avatar{
+    width:20px;height:20px;border-radius:50%;background:var(--d-mech);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;margin-left:4px;
+  }
+
+  /* ================= APP BODY ================= */
+  .app-body{display:grid;grid-template-columns:230px 1fr;height:calc(100vh - 34px);}
+
+  .sidebar{
+    background:var(--bg-subtle);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+    padding:12px 10px 10px;
+    overflow-y:auto;
+  }
+
+  .project-switch{
+    display:flex;align-items:center;gap:9px;
+    padding:6px 7px;border-radius:var(--radius-md);
+    margin-bottom:14px;
+  }
+  .project-switch:hover{background:var(--line);}
+  .project-badge{
+    width:22px;height:22px;border-radius:var(--radius-md);background:var(--green);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9.5px;
+    flex-shrink:0;
+  }
+  .project-switch-text{flex:1;min-width:0;}
+  .project-switch-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .project-switch-sub{font-size:10.5px;color:var(--text-secondary);}
+  .project-switch svg{flex-shrink:0;color:var(--text-secondary);}
+
+  .nav-label{
+    font-size:10px;font-weight:600;color:var(--text-tertiary);
+    text-transform:uppercase;letter-spacing:.07em;
+    padding:12px 7px 5px;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:9px;
+    padding:6px 7px;border-radius:var(--radius-md);
+    font-size:12.5px;color:var(--text-secondary);font-weight:500;
+    width:100%;text-align:left;position:relative;
+  }
+  .nav-item svg{stroke:currentColor;}
+  .nav-item:hover{background:var(--line);color:var(--text);}
+  .nav-item.active{background:var(--bg);color:var(--green);font-weight:600;box-shadow:inset 0 0 0 1px var(--line);}
+  .nav-item.active::before{
+    content:"";position:absolute;left:-10px;top:5px;bottom:5px;width:2px;
+    background:var(--green);
+  }
+  .nav-count{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--text-tertiary);}
+
+  .sidebar-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--line);}
+  .sidebar-foot .nav-item{color:var(--text-secondary);}
+  .user-chip{display:flex;align-items:center;gap:8px;padding:7px;margin-top:2px;border-radius:var(--radius-md);}
+  .user-chip:hover{background:var(--line);}
+  .avatar{
+    width:22px;height:22px;border-radius:50%;background:var(--d-mech);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;
+  }
+  .user-name{font-size:12px;font-weight:600;}
+  .user-role{font-size:10.5px;color:var(--text-secondary);}
+
+  /* ================= MAIN / TOPBAR ================= */
+  .main{display:flex;flex-direction:column;min-width:0;}
+  .topbar{
+    height:44px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;flex-shrink:0;
+  }
+  .breadcrumb{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;}
+  .breadcrumb .chev{color:var(--text-tertiary);}
+  .breadcrumb b{color:var(--text);font-weight:600;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .search-box{
+    display:flex;align-items:center;gap:7px;
+    border:1px solid var(--line);border-radius:var(--radius-md);
+    padding:5px 8px 5px 9px;width:260px;color:var(--text-secondary);
+  }
+  .search-box:focus-within{border-color:var(--line-strong);}
+  .search-box input{border:none;outline:none;background:none;width:100%;font-size:12px;color:var(--text);}
+  .search-box input::placeholder{color:var(--text-tertiary);}
+  .kbd{
+    font-family:var(--font-mono);font-size:10px;color:var(--text-tertiary);
+    border:1px solid var(--line);border-radius:3px;padding:1px 4px;flex-shrink:0;
+  }
+  .icon-btn{width:28px;height:28px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);position:relative;}
+  .icon-btn:hover{background:var(--bg-subtle);color:var(--text);}
+  .notif-dot{position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg);}
+
+  .view{padding:24px 32px 56px;flex:1;min-width:0;overflow-y:auto;}
+  .view[hidden]{display:none;}
+  .view.flush{padding:0;overflow:hidden;}
+
+  /* ================= PAGE HEADER ================= */
+  .page-header{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    padding-bottom:16px;margin-bottom:22px;border-bottom:1px solid var(--line);
+  }
+  .page-title{font-size:18px;font-weight:700;letter-spacing:-.005em;}
+  .page-sub{font-size:12.5px;color:var(--text-secondary);margin-top:4px;}
+  .page-actions{display:flex;gap:8px;flex-shrink:0;}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 12px;border-radius:var(--radius-md);font-size:12px;font-weight:600;
+    border:1px solid transparent;white-space:nowrap;
+  }
+  .btn svg{width:13px;height:13px;stroke:currentColor;}
+  .btn-primary{background:var(--green);color:#fff;}
+  .btn-primary:hover{background:var(--green-hover);}
+  .btn-secondary{border-color:var(--line-strong);color:var(--text);background:var(--bg);}
+  .btn-secondary:hover{border-color:var(--text-secondary);}
+  .btn-ghost{color:var(--text-secondary);}
+  .btn-ghost:hover{color:var(--text);background:var(--bg-subtle);}
+  .btn-destructive{border-color:var(--line-strong);color:var(--red);background:var(--bg);}
+  .btn-destructive:hover{border-color:var(--red);background:var(--red-tint);}
+  .btn-sm{padding:5px 10px;font-size:11.5px;}
+
+  /* ================= METRICS ================= */
+  .metrics-row{display:flex;margin-bottom:28px;}
+  .metric{flex:1;padding-right:22px;margin-right:22px;border-right:1px solid var(--line);}
+  .metric:last-child{border-right:none;margin-right:0;padding-right:0;}
+  .metric-label{font-size:10.5px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;}
+  .metric-value{font-family:var(--font-mono);font-size:22px;font-weight:600;letter-spacing:-.01em;}
+  .metric-delta{font-size:11px;color:var(--green);margin-top:5px;font-weight:500;}
+  .metric-delta.neutral{color:var(--text-secondary);font-weight:400;}
+
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .section-title{font-size:12.5px;font-weight:700;}
+  .section-link{font-size:11.5px;color:var(--green);font-weight:600;}
+  .section-link:hover{color:var(--green-hover);}
+
+  .split-2{display:grid;grid-template-columns:1.7fr 1fr;gap:40px;}
+
+  /* ================= TABLES ================= */
+  table{width:100%;border-collapse:collapse;}
+  thead th{
+    text-align:left;font-size:10px;font-weight:600;color:var(--text-secondary);
+    text-transform:uppercase;letter-spacing:.04em;
+    padding:0 8px 7px;border-bottom:1px solid var(--line-strong);
+  }
+  tbody td{padding:9px 8px;border-bottom:1px solid var(--line);font-size:12.5px;vertical-align:middle;}
+  tbody tr:hover td{background:var(--bg-subtle);}
+  tbody tr:last-child td{border-bottom:none;}
+  .cell-id{font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);}
+  .cell-title{font-weight:600;}
+  .cell-sub{font-size:11px;color:var(--text-secondary);margin-top:1px;}
+  .cell-loc{color:var(--text-secondary);font-size:12px;}
+  .row-clickable{cursor:pointer;}
+
+  /* ================= BADGES / STATUS ================= */
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:2px 7px;border-radius:3px;font-size:10px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;
+  }
+  .badge::before{content:"";width:5px;height:5px;border-radius:1px;background:currentColor;}
+  .badge--review{background:var(--amber-tint);color:var(--amber);}
+  .badge--open{background:var(--blue-tint);color:var(--blue);}
+  .badge--blocked{background:var(--red-tint);color:var(--red);}
+  .badge--closed{background:var(--bg-subtle);color:var(--text-secondary);}
+  .badge--verified{background:var(--green-tint);color:var(--green);}
+
+  .priority{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);}
+  .priority::before{content:"";width:6px;height:6px;flex-shrink:0;}
+  .priority-High::before{background:var(--red);}
+  .priority-Medium::before{background:var(--amber);}
+  .priority-Low::before{background:var(--text-tertiary);}
+
+  .disc-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary);font-weight:600;}
+  .disc-chip::before{content:"";width:6px;height:6px;flex-shrink:0;}
+  .disc-ARCH::before{background:var(--d-arch);}
+  .disc-MECH::before{background:var(--d-mech);}
+  .disc-ELEC::before{background:var(--d-elec);}
+  .disc-FP::before{background:var(--d-fp);}
+
+  /* ================= ACTIVITY ================= */
+  .activity-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .activity-item:last-child{border-bottom:none;padding-bottom:0;}
+  .activity-icon{
+    width:19px;height:19px;border-radius:50%;background:var(--bg-subtle);color:var(--text-secondary);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;
+  }
+  .activity-icon svg{width:11px;height:11px;stroke:currentColor;}
+  .activity-text{font-size:12px;}
+  .activity-text b{font-weight:600;}
+  .activity-time{font-size:10.5px;color:var(--text-tertiary);margin-top:2px;font-family:var(--font-mono);}
+
+  /* ================= PROGRESS ================= */
+  .progress-row{display:flex;align-items:center;gap:12px;padding:9px 0;}
+  .progress-row + .progress-row{border-top:1px solid var(--line);}
+  .progress-label{width:106px;font-size:12px;font-weight:500;flex-shrink:0;}
+  .progress-track{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--green);}
+  .progress-pct{width:34px;text-align:right;font-family:var(--font-mono);font-size:11.5px;color:var(--text-secondary);flex-shrink:0;}
+
+  /* ================= TABS ================= */
+  .tabbar{display:flex;gap:20px;border-bottom:1px solid var(--line);margin-bottom:18px;}
+  .tab{
+    padding:8px 1px;font-size:12.5px;font-weight:600;color:var(--text-secondary);
+    border-bottom:2px solid transparent;margin-bottom:-1px;
+  }
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--green);border-bottom-color:var(--green);}
+
+  /* ================= FILTER BAR ================= */
+  .filter-bar{display:flex;align-items:center;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .filter-chip{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:5px 9px;border:1px solid var(--line);border-radius:var(--radius-md);
+    font-size:11.5px;color:var(--text-secondary);font-weight:500;
+  }
+  .filter-chip:hover{border-color:var(--line-strong);color:var(--text);}
+  .filter-chip svg{width:11px;height:11px;}
+  .filter-spacer{flex:1;}
+  .filter-search{
+    display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:var(--radius-md);padding:5px 9px;width:200px;
+  }
+  .filter-search input{border:none;outline:none;background:none;width:100%;font-size:11.5px;}
+
+  /* ================= DRAWINGS WORKBENCH ================= */
+  .workbench{display:grid;grid-template-columns:236px 1fr 320px;height:calc(100vh - 34px - 44px);}
+  .wb-panel{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;}
+  .wb-panel-head{padding:12px 14px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .wb-panel-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);}
+  .sheet-tree{overflow-y:auto;flex:1;padding:6px 0;}
+
+  .tree-group-head{
+    display:flex;align-items:center;gap:6px;padding:7px 14px;cursor:pointer;
+  }
+  .tree-group-head:hover{background:var(--bg-subtle);}
+  .tree-caret{width:9px;height:9px;color:var(--text-tertiary);transition:transform .12s;flex-shrink:0;}
+  .tree-caret svg{width:100%;height:100%;}
+  .tree-group.collapsed .tree-caret{transform:rotate(-90deg);}
+  .tree-group.collapsed .tree-children{display:none;}
+  .tree-group-name{font-size:10.5px;font-weight:700;color:var(--text-secondary);letter-spacing:.02em;flex:1;}
+  .tree-group-count{font-family:var(--font-mono);font-size:10px;color:var(--text-tertiary);}
+
+  .sheet-item{
+    padding:7px 14px 7px 27px;cursor:pointer;border-left:2px solid transparent;
+  }
+  .sheet-item:hover{background:var(--bg-subtle);}
+  .sheet-item.active{background:var(--green-tint);border-left-color:var(--green);}
+  .sheet-num{font-family:var(--font-mono);font-size:12px;font-weight:600;}
+  .sheet-name{font-size:11px;color:var(--text-secondary);margin-top:1px;}
+  .sheet-rev{font-family:var(--font-mono);font-size:10px;color:var(--text-tertiary);margin-top:2px;}
+  .sheet-rev.current{color:var(--green);}
+
+  .wb-legend{padding:9px 14px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:9px;}
+
+  .wb-canvas-wrap{display:flex;flex-direction:column;min-width:0;background:var(--bg);border-right:1px solid var(--line);}
+  .wb-toolbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 16px;height:42px;border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  .viewmode-tabs{display:flex;gap:18px;height:100%;}
+  .viewmode-tab{
+    font-size:12px;font-weight:600;color:var(--text-secondary);
+    display:flex;align-items:center;border-bottom:2px solid transparent;
+  }
+  .viewmode-tab.active{color:var(--green);border-bottom-color:var(--green);}
+  .wb-tools{display:flex;gap:6px;}
+  .wb-canvas{
+    flex:1;position:relative;overflow:hidden;
+    background-color:var(--bg-canvas);
+    background-image:radial-gradient(var(--line-strong) 1px, transparent 1px);
+    background-size:20px 20px;
+  }
+  .wb-canvas svg{width:100%;height:100%;}
+  .room-rect{fill:#FFFFFF;stroke:var(--line-strong);stroke-width:1.2;}
+  .room-label{font-family:var(--font-mono);font-size:10px;fill:var(--text-secondary);letter-spacing:.01em;}
+  .room-sub{font-family:var(--font-mono);font-size:8px;fill:var(--text-tertiary);}
+  .issue-pin{cursor:pointer;}
+  .issue-pin .ring{fill:none;stroke-width:1.3;}
+  .issue-pin .core{fill:currentColor;}
+  .issue-pin .tick{stroke-width:1.3;}
+  .issue-pin.selected .ring{stroke-width:1.6;}
+  .leader-line{stroke:var(--text);stroke-width:1;}
+  .leader-label-bg{fill:#fff;stroke:var(--line-strong);stroke-width:1;}
+  .leader-label-text{font-family:var(--font-mono);font-size:9.5px;fill:var(--text);font-weight:600;}
+
+  .wb-context{
+    height:28px;border-top:1px solid var(--line);flex-shrink:0;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 16px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-secondary);
+  }
+
+  .inspector{display:flex;flex-direction:column;overflow-y:auto;}
+  .insp-block{padding:15px 16px;border-bottom:1px solid var(--line);}
+  .insp-block:last-of-type{border-bottom:none;}
+  .insp-eyebrow{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:8px;}
+  .insp-id{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);}
+  .insp-title{font-size:13.5px;font-weight:700;margin-top:3px;line-height:1.35;}
+  .insp-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;}
+  .insp-meta-label{font-size:9.5px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.03em;}
+  .insp-meta-value{font-size:12px;font-weight:600;margin-top:2px;}
+  .insp-meta-value.mono{font-family:var(--font-mono);font-weight:500;font-size:11.5px;}
+  .insp-text{font-size:12px;color:var(--text);line-height:1.6;}
+  .cite{
+    display:inline-block;color:var(--green);
+    font-family:var(--font-mono);font-size:11px;font-weight:600;
+    border-bottom:1px solid var(--green-tint);
+  }
+  .evidence-thumb{
+    width:100%;height:88px;border-radius:var(--radius);border:1px solid var(--line);
+    margin-top:9px;position:relative;overflow:hidden;
+    background:var(--bg-canvas);
+    background-image:repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 9px);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .evidence-thumb svg{width:22px;height:22px;stroke:var(--text-tertiary);}
+  .evidence-cap{font-size:10.5px;color:var(--text-secondary);margin-top:6px;font-family:var(--font-mono);}
+  .conf-row{display:flex;align-items:center;gap:9px;margin-top:8px;}
+  .conf-row:first-child{margin-top:0;}
+  .conf-label{width:78px;font-size:11px;color:var(--text-secondary);flex-shrink:0;}
+  .conf-track{flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden;}
+  .conf-fill{height:100%;background:var(--green);}
+  .conf-val{width:26px;text-align:right;font-family:var(--font-mono);font-size:10.5px;color:var(--text-secondary);}
+
+  .callout{
+    display:flex;gap:8px;padding:9px 10px;border-radius:var(--radius);
+    background:var(--amber-tint);border-left:2px solid var(--amber);
+  }
+  .callout svg{width:13px;height:13px;stroke:var(--amber);flex-shrink:0;margin-top:1px;}
+  .callout p{font-size:11px;color:#5B4108;line-height:1.5;}
+  .callout.ok{background:var(--green-tint);border-left-color:var(--green);}
+  .callout.ok svg{stroke:var(--green);}
+  .callout.ok p{color:#0F4A31;}
+
+  .insp-actions{display:flex;gap:7px;padding:14px 16px;border-top:1px solid var(--line-strong);margin-top:auto;}
+  .insp-actions .btn{flex:1;justify-content:center;}
+
+  /* ================= FIELD EVIDENCE ================= */
+  .evidence-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:18px 16px;}
+  .evidence-tile-img{
+    width:100%;aspect-ratio:4/3;border-radius:var(--radius);border:1px solid var(--line);
+    position:relative;overflow:hidden;background:var(--bg-canvas);
+    background-image:repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 9px);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .evidence-tile-img svg{width:24px;height:24px;stroke:var(--text-tertiary);}
+  .evidence-tile-img .type-strip{
+    position:absolute;bottom:0;left:0;right:0;background:rgba(23,33,27,.68);color:#fff;
+    font-size:9px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+    padding:3px 6px;
+  }
+  .evidence-tile-img .link-dot{
+    position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;
+    background:var(--green);border:1.5px solid #fff;
+  }
+  .evidence-tile-img .link-dot.unlinked{background:var(--amber);}
+  .evidence-title{font-size:12px;font-weight:600;margin-top:8px;}
+  .evidence-meta{font-size:10.5px;color:var(--text-secondary);margin-top:2px;}
+  .evidence-tags{font-size:10.5px;color:var(--text-tertiary);margin-top:3px;font-family:var(--font-mono);}
+
+  /* ================= ISSUES / REVIEW QUEUE ================= */
+  .queue-item{padding:18px 0;border-bottom:1px solid var(--line-strong);}
+  .queue-item:first-child{padding-top:0;}
+  .queue-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .queue-head-left{display:flex;align-items:center;gap:10px;}
+  .queue-cols{display:grid;grid-template-columns:1.1fr 1.3fr 1.3fr 1fr;gap:22px;margin-bottom:14px;}
+  .queue-col-label{font-size:9.5px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .queue-col-body{font-size:12px;line-height:1.55;}
+  .queue-actions{display:flex;gap:7px;align-items:center;}
+  .queue-actions .btn{flex:none;}
+  .reject-select{
+    border:1px solid var(--line);border-radius:var(--radius-md);padding:6px 9px;font-size:11.5px;color:var(--text-secondary);
+  }
+
+  /* ================= REPORTS ================= */
+  .reports-layout{display:grid;grid-template-columns:236px 1fr 244px;gap:0;height:calc(100vh - 34px - 34px);}
+  .report-queue{border-right:1px solid var(--line);overflow-y:auto;}
+  .report-queue-group-label{padding:12px 14px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-tertiary);}
+  .report-queue-item{
+    padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:2px solid transparent;
+  }
+  .report-queue-item:hover{background:var(--bg-subtle);}
+  .report-queue-item.active{background:var(--green-tint);border-left-color:var(--green);}
+  .rq-title{font-size:12px;font-weight:600;}
+  .rq-sub{font-size:10.5px;color:var(--text-secondary);margin-top:2px;}
+
+  .doc-preview-wrap{overflow-y:auto;padding:30px 36px;background:var(--bg-subtle);}
+  .doc-sheet{
+    max-width:600px;margin:0 auto;background:#fff;border:1px solid var(--line);
+    padding:36px 40px 28px;
+  }
+  .doc-eyebrow{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--green);}
+  .doc-title{font-size:16.5px;font-weight:700;margin-top:5px;line-height:1.35;}
+  .doc-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);}
+  .doc-meta-label{font-size:9.5px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.03em;}
+  .doc-meta-value{font-size:12px;font-weight:600;margin-top:2px;}
+  .doc-section{margin-top:20px;}
+  .doc-section-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px;}
+  .doc-section-body{font-size:12.5px;line-height:1.65;}
+  .doc-citeblock{
+    background:var(--green-tint);border-radius:var(--radius);padding:10px 12px;margin-top:7px;
+    font-size:12px;line-height:1.6;
+  }
+  .doc-citeblock .cite-ref{display:block;margin-top:5px;font-family:var(--font-mono);font-size:10.5px;color:var(--green);font-weight:600;}
+  .doc-footer{margin-top:26px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:9.5px;color:var(--text-tertiary);display:flex;justify-content:space-between;}
+
+  .source-panel{border-left:1px solid var(--line);padding:16px 15px;overflow-y:auto;}
+  .source-panel-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-tertiary);margin-bottom:12px;}
+  .source-item{padding:10px 0;border-bottom:1px solid var(--line);}
+  .source-item:first-child{padding-top:0;}
+  .source-item-label{font-size:9.5px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.03em;}
+  .source-item-value{font-size:12px;font-weight:600;margin-top:3px;font-family:var(--font-mono);}
+  .source-item-para{font-size:11px;color:var(--text-secondary);margin-top:3px;}
+
+  .mt-28{margin-top:28px;}
+</style>
+</head>
+<body>
+
+<div class="global-bar">
+  <div class="global-left">
+    <svg class="global-mark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <circle cx="12" cy="12" r="8"/>
+      <line x1="12" y1="1.5" x2="12" y2="5.5"/>
+      <line x1="12" y1="18.5" x2="12" y2="22.5"/>
+      <line x1="1.5" y1="12" x2="5.5" y2="12"/>
+      <line x1="18.5" y1="12" x2="22.5" y2="12"/>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+    </svg>
+    <span class="global-name">BUILI</span>
+    <span class="global-sep">/</span>
+    <span class="global-project">Pioneer Office Renovation</span>
+  </div>
+  <div class="global-right">
+    <button class="global-icon-btn" title="Applications">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>
+    </button>
+    <button class="global-icon-btn" title="Help">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a2.8 2.8 0 0 1 5.4.9c0 1.8-2.4 2-2.4 3.6"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <div class="global-avatar">JC</div>
+  </div>
+</div>
+
+<div class="app-body">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="project-switch">
+      <div class="project-badge">PO</div>
+      <div class="project-switch-text">
+        <div class="project-switch-name">Pioneer Office Renovation</div>
+        <div class="project-switch-sub">San Jose, CA · Active</div>
+      </div>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>
+    </div>
+
+    <div class="nav-label">Workspace</div>
+    <button class="nav-item active" data-view="overview">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"/></svg>
+      Overview
+    </button>
+    <button class="nav-item" data-view="drawings">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12,3 21,8 12,13 3,8"/><polyline points="3,13 12,18 21,13"/><polyline points="3,17.4 12,22.4 21,17.4"/></svg>
+      Drawings &amp; 3D
+    </button>
+    <button class="nav-item" data-view="evidence">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7.5h3l1.8-2h6.4l1.8 2h3v12H4z"/><circle cx="12" cy="13.3" r="3.2"/></svg>
+      Field Evidence
+    </button>
+    <button class="nav-item" data-view="issues">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><polyline points="8,12.3 10.8,15 16,9.5"/></svg>
+      Issues
+      <span class="nav-count">24</span>
+    </button>
+    <button class="nav-item" data-view="reports">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 3h7l4 4v14h-11z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="13.6" x2="15" y2="13.6"/><line x1="9" y1="17.2" x2="13" y2="17.2"/></svg>
+      Reports
+    </button>
+
+    <div class="nav-label">Project Data</div>
+    <button class="nav-item" data-view="overview">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3.2 20c0-3.6 2.6-6 5.8-6s5.8 2.4 5.8 6"/><circle cx="17" cy="9" r="2.3"/><path d="M15.6 14.1c2.5.5 4 2.5 4 5.9"/></svg>
+      Directory
+    </button>
+    <button class="nav-item" data-view="overview">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 12a7.4 7.4 0 0 0-.1-1.3l2-1.5-2-3.4-2.3.9a7.6 7.6 0 0 0-2.2-1.3L14.4 3h-4.8l-.4 2.4A7.6 7.6 0 0 0 7 6.7l-2.3-.9-2 3.4 2 1.5a7.4 7.4 0 0 0 0 2.6l-2 1.5 2 3.4 2.3-.9c.65.55 1.4 1 2.2 1.3l.4 2.4h4.8l.4-2.4a7.6 7.6 0 0 0 2.2-1.3l2.3.9 2-3.4-2-1.5c.07-.43.1-.86.1-1.3z"/></svg>
+      Settings
+    </button>
+
+    <div class="sidebar-foot">
+      <button class="nav-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="11.5"/><circle cx="12" cy="8.2" r=".6" fill="currentColor" stroke="none"/></svg>
+        Help center
+      </button>
+      <div class="user-chip">
+        <div class="avatar">JC</div>
+        <div>
+          <div class="user-name">Jordan Cho</div>
+          <div class="user-role">Project Manager</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+
+    <div class="topbar">
+      <div class="breadcrumb">Projects <span class="chev">›</span> <b id="crumb">Overview</b></div>
+      <div class="topbar-right">
+        <div class="search-box">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.2" y2="15.2"/></svg>
+          <input type="text" placeholder="Search drawings, RFIs, issues">
+          <span class="kbd">⌘K</span>
+        </div>
+        <button class="icon-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+          <span class="notif-dot"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= OVERVIEW ================= -->
+    <div class="view" id="view-overview">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Pioneer Office Renovation</div>
+          <div class="page-sub">Drawing-grounded site verification for a 24,800 sq ft tenant improvement project · Current set M-202 Rev 3 · Synced 14 min ago</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4"/><polyline points="6,9.5 12,4 18,9.5"/><line x1="4" y1="20" x2="20" y2="20"/></svg>
+            Upload evidence
+          </button>
+          <button class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New issue
+          </button>
+        </div>
+      </div>
+
+      <div class="metrics-row">
+        <div class="metric">
+          <div class="metric-label">Open issues</div>
+          <div class="metric-value">24</div>
+          <div class="metric-delta neutral">7 awaiting review</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Evidence coverage</div>
+          <div class="metric-value">86%</div>
+          <div class="metric-delta">+9% this week</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Median draft time</div>
+          <div class="metric-value">4m 18s</div>
+          <div class="metric-delta">72% faster than baseline</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Drawing alignment</div>
+          <div class="metric-value">97.6%</div>
+          <div class="metric-delta neutral">12 sheets verified</div>
+        </div>
+      </div>
+
+      <div class="split-2">
+        <div>
+          <div class="section-head">
+            <div class="section-title">Priority issues</div>
+            <a class="section-link" data-view="issues">View all issues →</a>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Issue</th><th>Location</th><th>Discipline</th><th>Status</th><th>Priority</th></tr>
+            </thead>
+            <tbody id="priority-issues-body"></tbody>
+          </table>
+
+          <div class="section-head mt-28">
+            <div class="section-title">Verification progress by discipline</div>
+            <a class="section-link" data-view="drawings">Open model →</a>
+          </div>
+          <div>
+            <div class="progress-row">
+              <div class="progress-label"><span class="disc-chip disc-ARCH">Architectural</span></div>
+              <div class="progress-track"><div class="progress-fill" style="width:92%;"></div></div>
+              <div class="progress-pct">92%</div>
+            </div>
+            <div class="progress-row">
+              <div class="progress-label"><span class="disc-chip disc-MECH">Mechanical</span></div>
+              <div class="progress-track"><div class="progress-fill" style="width:77%;"></div></div>
+              <div class="progress-pct">77%</div>
+            </div>
+            <div class="progress-row">
+              <div class="progress-label"><span class="disc-chip disc-ELEC">Electrical</span></div>
+              <div class="progress-track"><div class="progress-fill" style="width:69%;"></div></div>
+              <div class="progress-pct">69%</div>
+            </div>
+            <div class="progress-row">
+              <div class="progress-label"><span class="disc-chip disc-FP">Fire protection</span></div>
+              <div class="progress-track"><div class="progress-fill" style="width:81%;"></div></div>
+              <div class="progress-pct">81%</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-head">
+            <div class="section-title">Recent activity</div>
+            <a class="section-link">View log →</a>
+          </div>
+          <div class="activity-list">
+            <div class="activity-item">
+              <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7.5h3l1.8-2h6.4l1.8 2h3v12H4z"/><circle cx="12" cy="13" r="3"/></svg></div>
+              <div>
+                <div class="activity-text"><b>Maya Chen</b> added 6 field photos to Room 204.</div>
+                <div class="activity-time">18 MIN AGO</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="8,12 11,15 16,9"/></svg></div>
+              <div>
+                <div class="activity-text">Buili AI generated an RFI draft for <b>BUI-1042</b> with 5 source references.</div>
+                <div class="activity-time">22 MIN AGO</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 3h7l4 4v14h-11z"/><line x1="9" y1="10" x2="15" y2="10"/></svg></div>
+              <div>
+                <div class="activity-text"><b>Daniel Ruiz</b> approved drawing revision A-202 Rev 5.</div>
+                <div class="activity-time">1 HR AGO</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="8,12 11,15 16,9"/></svg></div>
+              <div>
+                <div class="activity-text">Issue <b>BUI-1014</b> was closed after field re-verification.</div>
+                <div class="activity-time">2 HR AGO</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= DRAWINGS & 3D ================= -->
+    <div class="view flush" id="view-drawings" hidden>
+      <div class="workbench">
+        <div class="wb-panel">
+          <div class="wb-panel-head">
+            <div class="wb-panel-title">Sheet tree · Current set</div>
+          </div>
+          <div class="sheet-tree" id="sheet-tree">
+            <div class="tree-group" data-group="arch">
+              <div class="tree-group-head" onclick="toggleGroup('arch')">
+                <span class="tree-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6,9 12,15 18,9"/></svg></span>
+                <span class="disc-chip disc-ARCH tree-group-name">Architectural</span>
+                <span class="tree-group-count">2</span>
+              </div>
+              <div class="tree-children">
+                <div class="sheet-item active">
+                  <div class="sheet-num">A-202</div>
+                  <div class="sheet-name">Level 2 plan</div>
+                  <div class="sheet-rev current">REV 5 · CURRENT</div>
+                </div>
+                <div class="sheet-item">
+                  <div class="sheet-num">A-601</div>
+                  <div class="sheet-name">Door schedule</div>
+                  <div class="sheet-rev current">REV 1 · CURRENT</div>
+                </div>
+              </div>
+            </div>
+            <div class="tree-group" data-group="mech">
+              <div class="tree-group-head" onclick="toggleGroup('mech')">
+                <span class="tree-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6,9 12,15 18,9"/></svg></span>
+                <span class="disc-chip disc-MECH tree-group-name">Mechanical</span>
+                <span class="tree-group-count">1</span>
+              </div>
+              <div class="tree-children">
+                <div class="sheet-item">
+                  <div class="sheet-num">M-202</div>
+                  <div class="sheet-name">HVAC plan</div>
+                  <div class="sheet-rev current">REV 3 · CURRENT</div>
+                </div>
+              </div>
+            </div>
+            <div class="tree-group" data-group="fp">
+              <div class="tree-group-head" onclick="toggleGroup('fp')">
+                <span class="tree-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6,9 12,15 18,9"/></svg></span>
+                <span class="disc-chip disc-FP tree-group-name">Fire protection</span>
+                <span class="tree-group-count">1</span>
+              </div>
+              <div class="tree-children">
+                <div class="sheet-item">
+                  <div class="sheet-num">FP-202</div>
+                  <div class="sheet-name">Fire protection plan</div>
+                  <div class="sheet-rev current">REV 2 · CURRENT</div>
+                </div>
+              </div>
+            </div>
+            <div class="tree-group" data-group="elec">
+              <div class="tree-group-head" onclick="toggleGroup('elec')">
+                <span class="tree-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6,9 12,15 18,9"/></svg></span>
+                <span class="disc-chip disc-ELEC tree-group-name">Electrical</span>
+                <span class="tree-group-count">1</span>
+              </div>
+              <div class="tree-children">
+                <div class="sheet-item">
+                  <div class="sheet-num">E-202</div>
+                  <div class="sheet-name">Power plan</div>
+                  <div class="sheet-rev current">REV 4 · CURRENT</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="wb-legend">
+            <span class="disc-chip disc-ARCH">Arch</span>
+            <span class="disc-chip disc-MECH">Mech</span>
+            <span class="disc-chip disc-ELEC">Elec</span>
+            <span class="disc-chip disc-FP">FP</span>
+          </div>
+        </div>
+
+        <div class="wb-canvas-wrap">
+          <div class="wb-toolbar">
+            <div class="viewmode-tabs">
+              <div class="viewmode-tab active" data-mode="2d">2D Plan</div>
+              <div class="viewmode-tab" data-mode="3d">3D Context</div>
+              <div class="viewmode-tab" data-mode="split">Split View</div>
+              <div class="viewmode-tab" data-mode="evidence">Evidence Overlay</div>
+            </div>
+            <div class="wb-tools">
+              <button class="btn btn-secondary btn-sm">Correction mode</button>
+              <button class="btn btn-primary btn-sm">Add issue pin</button>
+            </div>
+          </div>
+          <div class="wb-canvas">
+            <svg viewBox="0 0 720 460" preserveAspectRatio="xMidYMid meet">
+              <rect class="room-rect" x="40" y="40" width="220" height="160"/>
+              <text class="room-label" x="52" y="64">OPEN OFFICE 201</text>
+              <text class="room-sub" x="52" y="78">1,840 SF</text>
+
+              <rect class="room-rect" x="270" y="40" width="150" height="90"/>
+              <text class="room-label" x="282" y="64">BREAK ROOM</text>
+
+              <rect class="room-rect" x="430" y="40" width="120" height="90"/>
+              <text class="room-label" x="442" y="64">OFFICE 202</text>
+
+              <rect class="room-rect" x="560" y="40" width="120" height="200"/>
+              <text class="room-label" x="572" y="64">STORAGE</text>
+
+              <rect class="room-rect" x="270" y="140" width="150" height="130"/>
+              <text class="room-label" x="282" y="164">ROOM 204</text>
+              <text class="room-sub" x="282" y="178">GRID C-4</text>
+
+              <rect class="room-rect" x="430" y="140" width="120" height="130"/>
+              <text class="room-label" x="442" y="164">CONFERENCE</text>
+
+              <rect class="room-rect" x="40" y="210" width="220" height="130"/>
+              <text class="room-label" x="52" y="234">WEST CORRIDOR</text>
+
+              <rect class="room-rect" x="560" y="250" width="120" height="90"/>
+              <text class="room-label" x="572" y="274">ELEC 101</text>
+
+              <line x1="40" y1="352" x2="680" y2="352" stroke="var(--line-strong)" stroke-width="1"/>
+              <text class="room-sub" x="40" y="370">SCALE 1/8" = 1'-0"    NORTH ↑</text>
+
+              <g id="leader-layer"></g>
+
+              <g class="issue-pin" data-issue="BUI-1042" data-color="var(--red)" transform="translate(370,205)">
+                <circle class="ring" r="8" stroke="var(--red)"/>
+                <line class="tick" x1="-11" y1="0" x2="-9" y2="0" stroke="var(--red)"/>
+                <line class="tick" x1="9" y1="0" x2="11" y2="0" stroke="var(--red)"/>
+                <line class="tick" x1="0" y1="-11" x2="0" y2="-9" stroke="var(--red)"/>
+                <line class="tick" x1="0" y1="9" x2="0" y2="11" stroke="var(--red)"/>
+                <circle class="core" r="2.4" fill="var(--red)"/>
+              </g>
+              <g class="issue-pin" data-issue="BUI-1038" data-color="var(--amber)" transform="translate(150,270)">
+                <circle class="ring" r="8" stroke="var(--amber)"/>
+                <line class="tick" x1="-11" y1="0" x2="-9" y2="0" stroke="var(--amber)"/>
+                <line class="tick" x1="9" y1="0" x2="11" y2="0" stroke="var(--amber)"/>
+                <line class="tick" x1="0" y1="-11" x2="0" y2="-9" stroke="var(--amber)"/>
+                <line class="tick" x1="0" y1="9" x2="0" y2="11" stroke="var(--amber)"/>
+                <circle class="core" r="2.4" fill="var(--amber)"/>
+              </g>
+              <g class="issue-pin" data-issue="BUI-1033" data-color="var(--red)" transform="translate(500,175)">
+                <circle class="ring" r="8" stroke="var(--red)"/>
+                <line class="tick" x1="-11" y1="0" x2="-9" y2="0" stroke="var(--red)"/>
+                <line class="tick" x1="9" y1="0" x2="11" y2="0" stroke="var(--red)"/>
+                <line class="tick" x1="0" y1="-11" x2="0" y2="-9" stroke="var(--red)"/>
+                <line class="tick" x1="0" y1="9" x2="0" y2="11" stroke="var(--red)"/>
+                <circle class="core" r="2.4" fill="var(--red)"/>
+              </g>
+              <g class="issue-pin" data-issue="BUI-1027" data-color="var(--text-tertiary)" transform="translate(120,110)">
+                <circle class="ring" r="8" stroke="var(--text-tertiary)"/>
+                <line class="tick" x1="-11" y1="0" x2="-9" y2="0" stroke="var(--text-tertiary)"/>
+                <line class="tick" x1="9" y1="0" x2="11" y2="0" stroke="var(--text-tertiary)"/>
+                <line class="tick" x1="0" y1="-11" x2="0" y2="-9" stroke="var(--text-tertiary)"/>
+                <line class="tick" x1="0" y1="9" x2="0" y2="11" stroke="var(--text-tertiary)"/>
+                <circle class="core" r="2.4" fill="var(--text-tertiary)"/>
+              </g>
+            </svg>
+          </div>
+          <div class="wb-context">
+            <span id="wb-hint">Click an issue pin to inspect drawing references and field evidence.</span>
+            <span>X 412.6&nbsp;&nbsp;Y 208.1&nbsp;&nbsp;·&nbsp;&nbsp;4 objects on sheet</span>
+          </div>
+        </div>
+
+        <div class="inspector" id="inspector"></div>
+      </div>
+    </div>
+
+    <!-- ================= FIELD EVIDENCE ================= -->
+    <div class="view" id="view-evidence" hidden>
+      <div class="page-header">
+        <div>
+          <div class="page-title">Field Evidence</div>
+          <div class="page-sub">Photos, videos, voice notes, and measurements linked to exact project locations.</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4"/><polyline points="6,9.5 12,4 18,9.5"/><line x1="4" y1="20" x2="20" y2="20"/></svg>
+            Upload evidence
+          </button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="filter-chip">All floors <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+        <button class="filter-chip">All evidence types <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+        <button class="filter-chip">Any link status <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+        <div class="filter-spacer"></div>
+        <button class="filter-chip">Sort: Newest <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+      </div>
+
+      <div class="evidence-grid" id="evidence-grid"></div>
+    </div>
+
+    <!-- ================= ISSUES ================= -->
+    <div class="view" id="view-issues" hidden>
+      <div class="page-header">
+        <div>
+          <div class="page-title">Issues</div>
+          <div class="page-sub">Track observations from field capture to reviewed RFI, punch item, or change evidence.</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary">Export CSV</button>
+          <button class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New issue
+          </button>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <div class="tab active" data-issuestab="list">Issue list</div>
+        <div class="tab" data-issuestab="review">Review queue <span style="color:var(--amber);font-weight:700;">· 7</span></div>
+      </div>
+
+      <div id="issues-list-panel">
+        <div class="filter-bar">
+          <div class="filter-search">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.2" y2="15.2"/></svg>
+            <input type="text" placeholder="Search issues">
+          </div>
+          <button class="filter-chip">All statuses <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+          <button class="filter-chip">All issue types <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+          <button class="filter-chip">All assignees <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg></button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Issue</th><th>Location</th><th>Source</th><th>Status</th><th>Assignee</th><th>Updated</th></tr>
+          </thead>
+          <tbody id="issues-table-body"></tbody>
+        </table>
+      </div>
+
+      <div id="issues-review-panel" style="display:none;" hidden></div>
+    </div>
+
+    <!-- ================= REPORTS ================= -->
+    <div class="view flush" id="view-reports" hidden>
+      <div class="reports-layout">
+        <div class="report-queue">
+          <div class="report-queue-group-label">Awaiting review</div>
+          <div class="report-queue-item active">
+            <div class="rq-title">RFI Draft — BUI-1042</div>
+            <div class="rq-sub">Updated 22 min ago</div>
+          </div>
+          <div class="report-queue-group-label">Ready to issue</div>
+          <div class="report-queue-item">
+            <div class="rq-title">Punch List · Level 2</div>
+            <div class="rq-sub">12 items · Generated today</div>
+          </div>
+          <div class="report-queue-group-label">Issued</div>
+          <div class="report-queue-item">
+            <div class="rq-title">Change Evidence · Week 28</div>
+            <div class="rq-sub">5 issues · Generated yesterday</div>
+          </div>
+          <div class="report-queue-item">
+            <div class="rq-title">Daily Field Summary</div>
+            <div class="rq-sub">July 9, 2026 · Approved</div>
+          </div>
+        </div>
+
+        <div class="doc-preview-wrap">
+          <div class="doc-sheet">
+            <div class="doc-eyebrow">Request for Information — Draft</div>
+            <div class="doc-title">HVAC duct conflicts with sprinkler line above Room 204</div>
+
+            <div class="doc-meta-grid">
+              <div><div class="doc-meta-label">Project</div><div class="doc-meta-value">Pioneer Office Renovation</div></div>
+              <div><div class="doc-meta-label">RFI reference</div><div class="doc-meta-value">Draft from BUI-1042</div></div>
+              <div><div class="doc-meta-label">Location</div><div class="doc-meta-value">Level 2 · Room 204 · Grid C-4</div></div>
+              <div><div class="doc-meta-label">Relevant drawings</div><div class="doc-meta-value">M-202 Rev 3 / FP-202 Rev 2</div></div>
+              <div><div class="doc-meta-label">Prepared by</div><div class="doc-meta-value">Maya Chen</div></div>
+              <div><div class="doc-meta-label">Status</div><div class="doc-meta-value"><span class="badge badge--review">PM review</span></div></div>
+            </div>
+
+            <div class="doc-section">
+              <div class="doc-section-label">Subject</div>
+              <div class="doc-section-body">Conflict between planned HVAC supply duct route and installed sprinkler main above Room 204.</div>
+            </div>
+
+            <div class="doc-section">
+              <div class="doc-section-label">Existing condition</div>
+              <div class="doc-section-body">Field evidence captured on July 10 shows the installed sprinkler main crossing the planned route of the 24×14 supply duct near Grid C-4. The current evidence does not establish the available vertical clearance.</div>
+            </div>
+
+            <div class="doc-section">
+              <div class="doc-section-label">Drawing requirement</div>
+              <div class="doc-citeblock">
+                M-202 Rev 3, Detail 3 shows a continuous 24×14 supply duct through Room 204. FP-202 Rev 2 indicates the sprinkler main crossing the same plan area, but the relative elevation is not identified in the reviewed sheets.
+                <span class="cite-ref">M-202 · Detail 3 · Rev 3</span>
+              </div>
+            </div>
+
+            <div class="doc-section">
+              <div class="doc-section-label">Question</div>
+              <div class="doc-section-body">Please confirm the required routing and elevation relationship between the supply duct and sprinkler main at Grid C-4. If rerouting is required, identify the preferred trade and any revised clearance requirement.</div>
+            </div>
+
+            <div class="doc-section">
+              <div class="doc-section-label">Schedule impact</div>
+              <div class="doc-section-body">Duct installation in Room 204 is currently on hold pending direction. Continued delay may affect ceiling close-in planned for July 14.</div>
+            </div>
+
+            <div class="doc-section">
+              <div class="doc-section-label">Attached evidence</div>
+              <div class="doc-section-body">1 field photograph, 1 voice note transcript, plan excerpts from M-202 Rev 3 and FP-202 Rev 2, and spatial issue location from the Buili model.</div>
+            </div>
+
+            <div class="doc-footer">
+              <span>BUILI · REVIEW-READY DRAFT · NOT ISSUED</span>
+              <span>PAGE 1 OF 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="source-panel">
+          <div class="source-panel-title">Source panel</div>
+          <div class="source-item">
+            <div class="source-item-label">Drawing</div>
+            <div class="source-item-value">M-202 · Rev 3</div>
+            <div class="source-item-para">Detail 3 — supply duct routing, Room 204</div>
+          </div>
+          <div class="source-item">
+            <div class="source-item-label">Drawing</div>
+            <div class="source-item-value">FP-202 · Rev 2</div>
+            <div class="source-item-para">Sprinkler main layout, Level 2</div>
+          </div>
+          <div class="source-item">
+            <div class="source-item-label">Field evidence</div>
+            <div class="source-item-value">IMG_2048</div>
+            <div class="source-item-para">Captured 9:42 AM · Maya Chen</div>
+          </div>
+          <div class="source-item">
+            <div class="source-item-label">Field evidence</div>
+            <div class="source-item-value">VOICE_0113</div>
+            <div class="source-item-para">Voice note transcript, 0:41</div>
+          </div>
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:7px;">
+            <button class="btn btn-secondary" style="justify-content:center;">Save version</button>
+            <button class="btn btn-primary" style="justify-content:center;">Issue &amp; export</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const ISSUES = [
+  { id:'BUI-1042', title:'HVAC duct conflicts with sprinkler line', location:'Level 2 · Room 204', discipline:'MECH', status:'review', priority:'High', assignee:'Maya Chen', age:'18 min', drawing:'M-202 Rev 3 / FP-202 Rev 2',
+    observed:'Field photo and voice note indicate the sprinkler main crossing the planned duct route near Grid C-4.',
+    requirement:'M-202 shows a continuous 24×14 supply duct through Room 204 with no elevation change at this location.',
+    requirementSource:'M-202 · Detail 3 · Rev 3',
+    confidence:{geometry:91, location:88, retrieval:94, classification:90},
+    gapText:'Capture one wide-angle photo and one measurement showing vertical clearance between the duct path and sprinkler main.', gapOk:false },
+  { id:'BUI-1038', title:'Partition offset from A-202 layout', location:'Level 1 · West corridor', discipline:'ARCH', status:'open', priority:'Medium', assignee:'Daniel Ruiz', age:'1 hr', drawing:'A-202 Rev 5',
+    observed:'Framed partition sits approximately 4 in. east of the dimensioned centerline shown on the reflected layout.',
+    requirement:'A-202 dimensions the partition centerline at 14\'-6" from Grid B.',
+    requirementSource:'A-202 · Rev 5',
+    confidence:{geometry:84, location:90, retrieval:87, classification:88},
+    gapText:'Evidence sufficient — ready for punch item export.', gapOk:true },
+  { id:'BUI-1033', title:'Door hardware submittal mismatch', location:'Level 3 · Room 311', discipline:'ARCH', status:'blocked', priority:'High', assignee:'Maya Chen', age:'Yesterday', drawing:'A-601 / Submittal 087100',
+    observed:'Installed hardware set does not match the panic-hardware configuration noted on the approved submittal.',
+    requirement:'Submittal 087100 specifies a fail-safe electric strike at Door 311A.',
+    requirementSource:'Submittal 087100 · Rev 2',
+    confidence:{geometry:76, location:82, retrieval:90, classification:85},
+    gapText:'Confirm the currently approved submittal revision before drafting the RFI.', gapOk:false },
+  { id:'BUI-1027', title:'Ceiling tile damage after MEP work', location:'Level 2 · Open office', discipline:'ARCH', status:'open', priority:'Low', assignee:'Leo Park', age:'Yesterday', drawing:'Field photo',
+    observed:'Three ceiling tiles show water staining and crushed edges following overhead duct installation.',
+    requirement:'No drawing requirement associated — condition-based punch item.',
+    requirementSource:'—',
+    confidence:{geometry:70, location:93, retrieval:60, classification:92},
+    gapText:'Evidence sufficient — ready for punch item export.', gapOk:true },
+  { id:'BUI-1014', title:'Electrical room clearance incomplete', location:'Level 1 · E-101', discipline:'ELEC', status:'closed', priority:'Medium', assignee:'Daniel Ruiz', age:'2 days', drawing:'E-202 Rev 4',
+    observed:'Working clearance in front of panel E-101 verified after re-photographing on July 10.',
+    requirement:'E-202 requires 36 in. minimum working clearance in front of electrical panels.',
+    requirementSource:'E-202 · Rev 4',
+    confidence:{geometry:95, location:97, retrieval:92, classification:96},
+    gapText:'Evidence sufficient — closed with field re-verification.', gapOk:true },
+  { id:'BUI-1009', title:'Unverified ceiling height in Room 209', location:'Level 2 · Room 209', discipline:'ARCH', status:'review', priority:'Medium', assignee:'Maya Chen', age:'3 days', drawing:'A-202 / A-501',
+    observed:'Additional evidence required to confirm as-built ceiling height against the reflected ceiling plan.',
+    requirement:'A-501 indicates a finished ceiling height of 9\'-0" for Room 209.',
+    requirementSource:'A-501 · Rev 2',
+    confidence:{geometry:80, location:85, retrieval:88, classification:79},
+    gapText:'Request one elevation photo with a visible tape measure or laser reference.', gapOk:false }
+];
+
+const PIN_POS = {
+  'BUI-1042':{x:370,y:205,dx:70,dy:-52},
+  'BUI-1038':{x:150,y:270,dx:-64,dy:46},
+  'BUI-1033':{x:500,y:175,dx:64,dy:-40},
+  'BUI-1027':{x:120,y:110,dx:-58,dy:-34}
+};
+
+const STATUS_LABEL = { review:'Review', open:'Open', blocked:'Blocked', closed:'Closed' };
+function badge(status){ return '<span class="badge badge--'+status+'">'+STATUS_LABEL[status]+'</span>'; }
+function priority(p){ return '<span class="priority priority-'+p+'">'+p+'</span>'; }
+function discChip(d){ return '<span class="disc-chip disc-'+d+'">'+d+'</span>'; }
+
+/* ---------- Nav switching ---------- */
+const views = ['overview','drawings','evidence','issues','reports'];
+const crumbNames = {overview:'Overview', drawings:'Drawings & 3D', evidence:'Field Evidence', issues:'Issues', reports:'Reports'};
+function showView(name){
+  views.forEach(v=>{ document.getElementById('view-'+v).hidden = (v!==name); });
+  document.querySelectorAll('.nav-item[data-view]').forEach(el=>{
+    el.classList.toggle('active', el.dataset.view===name);
+  });
+  document.getElementById('crumb').textContent = crumbNames[name];
+}
+document.querySelectorAll('[data-view]').forEach(el=>{
+  el.addEventListener('click', ()=> showView(el.dataset.view));
+});
+
+/* ---------- Sheet tree collapse ---------- */
+function toggleGroup(name){
+  document.querySelector('.tree-group[data-group="'+name+'"]').classList.toggle('collapsed');
+}
+
+/* ---------- Overview: priority issues table ---------- */
+(function renderPriority(){
+  const body = document.getElementById('priority-issues-body');
+  const show = ISSUES.filter(i=>i.status!=='closed').slice(0,5);
+  body.innerHTML = show.map(i=>(
+    '<tr class="row-clickable" onclick="openIssueInDrawings(\''+i.id+'\')">'+
+      '<td><div class="cell-title">'+i.title+'</div><div class="cell-sub">'+i.id+'</div></td>'+
+      '<td class="cell-loc">'+i.location+'</td>'+
+      '<td>'+discChip(i.discipline)+'</td>'+
+      '<td>'+badge(i.status)+'</td>'+
+      '<td>'+priority(i.priority)+'</td>'+
+    '</tr>'
+  )).join('');
+})();
+
+/* ---------- Issues table ---------- */
+(function renderIssuesTable(){
+  const body = document.getElementById('issues-table-body');
+  body.innerHTML = ISSUES.map(i=>(
+    '<tr class="row-clickable" onclick="openIssueInDrawings(\''+i.id+'\')">'+
+      '<td class="cell-id">'+i.id+'</td>'+
+      '<td><div class="cell-title">'+i.title+'</div><div class="cell-sub">'+priority(i.priority)+'</div></td>'+
+      '<td class="cell-loc">'+i.location+'</td>'+
+      '<td class="cell-loc">'+i.drawing+'</td>'+
+      '<td>'+badge(i.status)+'</td>'+
+      '<td class="cell-loc">'+i.assignee+'</td>'+
+      '<td class="cell-loc">'+i.age+'</td>'+
+    '</tr>'
+  )).join('');
+})();
+
+/* ---------- Review queue ---------- */
+(function renderReviewQueue(){
+  const panel = document.getElementById('issues-review-panel');
+  const items = ISSUES.filter(i=>i.status==='review' || i.status==='blocked');
+  panel.innerHTML = items.map(i=>(
+    '<div class="queue-item">'+
+      '<div class="queue-head">'+
+        '<div class="queue-head-left"><span class="cell-id">'+i.id+'</span><span class="cell-title">'+i.title+'</span>'+badge(i.status)+priority(i.priority)+'</div>'+
+        '<a class="section-link" onclick="openIssueInDrawings(\''+i.id+'\')">Open in Drawings →</a>'+
+      '</div>'+
+      '<div class="queue-cols">'+
+        '<div><div class="queue-col-label">Location</div><div class="queue-col-body">'+i.location+'<br><span class="cell-sub">'+i.drawing+'</span></div></div>'+
+        '<div><div class="queue-col-label">Observed condition</div><div class="queue-col-body">'+i.observed+'</div></div>'+
+        '<div><div class="queue-col-label">Source &amp; requirement</div><div class="queue-col-body">'+i.requirement+'<br><span class="cell-sub">'+i.requirementSource+'</span></div></div>'+
+        '<div><div class="queue-col-label">Evidence gap</div><div class="queue-col-body" style="color:'+(i.gapOk?'var(--green)':'var(--amber)')+';">'+i.gapText+'</div></div>'+
+      '</div>'+
+      '<div class="queue-actions">'+
+        '<button class="btn btn-primary btn-sm">Approve draft</button>'+
+        '<button class="btn btn-destructive btn-sm">Reject</button>'+
+        '<select class="reject-select"><option>Reject reason…</option><option>Wrong location</option><option>Wrong source</option><option>Insufficient evidence</option><option>Wrong route</option><option>Duplicate</option><option>Not an issue</option></select>'+
+        '<button class="btn btn-ghost btn-sm">Request more evidence</button>'+
+      '</div>'+
+    '</div>'
+  )).join('');
+})();
+
+/* ---------- Issues tabs ---------- */
+document.querySelectorAll('[data-issuestab]').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-issuestab]').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const isList = tab.dataset.issuestab==='list';
+    document.getElementById('issues-list-panel').style.display = isList?'block':'none';
+    const rp = document.getElementById('issues-review-panel');
+    rp.style.display = isList?'none':'block';
+    rp.hidden = isList;
+  });
+});
+
+/* ---------- Drawings inspector ---------- */
+function renderInspector(issue){
+  const c = issue.confidence;
+  const rows = [
+    ['Geometry', c.geometry],
+    ['Location', c.location],
+    ['Retrieval', c.retrieval],
+    ['Classification', c.classification]
+  ];
+  document.getElementById('inspector').innerHTML =
+    '<div class="insp-block">'+
+      '<div class="insp-eyebrow">Issue inspector</div>'+
+      '<div class="insp-id">'+issue.id+'</div>'+
+      '<div class="insp-title">'+issue.title+'</div>'+
+      '<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'+badge(issue.status)+discChip(issue.discipline)+'</div>'+
+      '<div class="insp-meta-grid">'+
+        '<div><div class="insp-meta-label">Location</div><div class="insp-meta-value">'+issue.location+'</div></div>'+
+        '<div><div class="insp-meta-label">Drawing</div><div class="insp-meta-value mono">'+issue.drawing+'</div></div>'+
+        '<div><div class="insp-meta-label">Assigned to</div><div class="insp-meta-value">'+issue.assignee+'</div></div>'+
+        '<div><div class="insp-meta-label">Updated</div><div class="insp-meta-value mono">'+issue.age+'</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="insp-block">'+
+      '<div class="insp-eyebrow">Observed condition</div>'+
+      '<div class="insp-text">'+issue.observed+'</div>'+
+    '</div>'+
+    '<div class="insp-block">'+
+      '<div class="insp-eyebrow">Plan requirement</div>'+
+      '<div class="insp-text">'+issue.requirement+'</div>'+
+      '<div style="margin-top:7px;"><span class="cite">'+issue.requirementSource+'</span></div>'+
+    '</div>'+
+    '<div class="insp-block">'+
+      '<div class="insp-eyebrow">Field evidence</div>'+
+      '<div class="evidence-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7.5h3l1.8-2h6.4l1.8 2h3v12H4z"/><circle cx="12" cy="13.3" r="3.2"/></svg></div>'+
+      '<div class="evidence-cap">IMG_2048 · captured 9:42 AM</div>'+
+    '</div>'+
+    '<div class="insp-block">'+
+      '<div class="insp-eyebrow">Confidence</div>'+
+      rows.map(r=>(
+        '<div class="conf-row"><div class="conf-label">'+r[0]+'</div><div class="conf-track"><div class="conf-fill" style="width:'+r[1]+'%;"></div></div><div class="conf-val">'+r[1]+'</div></div>'
+      )).join('')+
+    '</div>'+
+    '<div class="insp-block">'+
+      '<div class="insp-eyebrow">Evidence gap</div>'+
+      (issue.gapOk
+        ? '<div class="callout ok"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="8,12 11,15 16,9"/></svg><p>'+issue.gapText+'</p></div>'
+        : '<div class="callout"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 3 2 20h20z"/><line x1="12" y1="10" x2="12" y2="14.5"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg><p>'+issue.gapText+'</p></div>')+
+    '</div>'+
+    '<div class="insp-actions">'+
+      '<button class="btn btn-secondary">Reject</button>'+
+      '<button class="btn btn-primary">Approve draft</button>'+
+    '</div>';
+}
+
+const svgNS = 'http://www.w3.org/2000/svg';
+function drawLeader(id){
+  const layer = document.getElementById('leader-layer');
+  layer.innerHTML = '';
+  const p = PIN_POS[id];
+  if(!p) return;
+  const x2 = p.x+p.dx, y2 = p.y+p.dy;
+  const line = document.createElementNS(svgNS,'line');
+  line.setAttribute('x1',p.x); line.setAttribute('y1',p.y);
+  line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+  line.setAttribute('class','leader-line');
+  layer.appendChild(line);
+
+  const label = id.replace('BUI-','BUI-');
+  const w = 58, h = 16;
+  const rx = p.dx<0 ? x2-w : x2;
+  const ry = y2-h/2;
+  const rect = document.createElementNS(svgNS,'rect');
+  rect.setAttribute('x',rx); rect.setAttribute('y',ry);
+  rect.setAttribute('width',w); rect.setAttribute('height',h);
+  rect.setAttribute('class','leader-label-bg');
+  layer.appendChild(rect);
+
+  const text = document.createElementNS(svgNS,'text');
+  text.setAttribute('x', rx+w/2); text.setAttribute('y', ry+h/2+3.4);
+  text.setAttribute('text-anchor','middle');
+  text.setAttribute('class','leader-label-text');
+  text.textContent = label;
+  layer.appendChild(text);
+}
+
+function selectPin(id){
+  document.querySelectorAll('.issue-pin').forEach(p=>p.classList.toggle('selected', p.dataset.issue===id));
+  const issue = ISSUES.find(i=>i.id===id);
+  if(issue){
+    renderInspector(issue);
+    document.getElementById('wb-hint').textContent = issue.id+' · '+issue.title;
+  }
+  if(PIN_POS[id]){ drawLeader(id); }
+  else{ document.getElementById('leader-layer').innerHTML=''; }
+}
+document.querySelectorAll('.issue-pin').forEach(pin=>{
+  pin.addEventListener('click', ()=> selectPin(pin.dataset.issue));
+});
+window.openIssueInDrawings = function(id){
+  showView('drawings');
+  selectPin(id);
+};
+selectPin('BUI-1042');
+
+/* ---------- Drawings viewmode tabs ---------- */
+document.querySelectorAll('.viewmode-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.viewmode-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+
+/* ---------- Field evidence grid ---------- */
+const ICONS = {
+  Photo:'<path d="M4 7.5h3l1.8-2h6.4l1.8 2h3v12H4z"/><circle cx="12" cy="13.3" r="3.2"/>',
+  Video:'<rect x="3" y="6" width="13" height="12" rx="1"/><polygon points="16,10 21,7.5 21,16.5 16,14"/>',
+  Voice:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21.5"/>',
+  Measure:'<rect x="3" y="9" width="18" height="6" rx="1"/><line x1="7" y1="9" x2="7" y2="12"/><line x1="11" y1="9" x2="11" y2="12"/><line x1="15" y1="9" x2="15" y2="12"/><line x1="19" y1="9" x2="19" y2="12"/>'
+};
+(function renderEvidence(){
+  const tiles = [
+    {title:'Room 204 ceiling conflict', loc:'Level 2 · 18 min ago', by:'Maya Chen', tags:'BUI-1042 · HVAC', type:'Photo', linked:true},
+    {title:'West corridor partition offset', loc:'Level 1 · 1 hr ago', by:'Daniel Ruiz', tags:'BUI-1038 · Framing', type:'Photo', linked:true},
+    {title:'Door 311 hardware set', loc:'Level 3 · Yesterday', by:'Maya Chen', tags:'BUI-1033 · Door', type:'Photo', linked:true},
+    {title:'Ceiling tile damage', loc:'Level 2 · Yesterday', by:'Leo Park', tags:'BUI-1027 · Finish', type:'Photo', linked:true},
+    {title:'Electrical room clearance', loc:'Level 1 · 2 days ago', by:'Daniel Ruiz', tags:'BUI-1014 · Electrical', type:'Video', linked:true},
+    {title:'Voice note: ceiling congestion', loc:'Level 2 · 2 days ago', by:'Maya Chen', tags:'Unlinked', type:'Voice', linked:false},
+    {title:'South wall dimension check', loc:'Level 1 · 3 days ago', by:'Leo Park', tags:'Measurement · Framing', type:'Measure', linked:false},
+    {title:'Open office above-ceiling walk', loc:'Level 2 · 3 days ago', by:'Maya Chen', tags:'360 video · MEP', type:'Video', linked:true},
+    {title:'Break room outlet spacing', loc:'Level 2 · 4 days ago', by:'Daniel Ruiz', tags:'BUI-1005 · Electrical', type:'Photo', linked:true},
+    {title:'Storage room shelving clearance', loc:'Level 2 · 4 days ago', by:'Leo Park', tags:'Unlinked', type:'Measure', linked:false}
+  ];
+  document.getElementById('evidence-grid').innerHTML = tiles.map(t=>(
+    '<div>'+
+      '<div class="evidence-tile-img">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">'+ICONS[t.type]+'</svg>'+
+        '<span class="link-dot '+(t.linked?'':'unlinked')+'"></span>'+
+        '<span class="type-strip">'+t.type+'</span>'+
+      '</div>'+
+      '<div class="evidence-title">'+t.title+'</div>'+
+      '<div class="evidence-meta">'+t.loc+' · '+t.by+'</div>'+
+      '<div class="evidence-tags">'+t.tags+'</div>'+
+    '</div>'
+  )).join('');
+})();
+
+/* ---------- Reports queue click ---------- */
+document.querySelectorAll('.report-queue-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.report-queue-item').forEach(i=>i.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>
