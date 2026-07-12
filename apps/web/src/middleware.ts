@@ -8,7 +8,7 @@ const PUBLIC_HOSTS = new Set([
   `app.${CANONICAL_MARKETING_HOST}`,
 ]);
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const rawHost = (
     request.headers.get('x-forwarded-host') ??
     request.headers.get('host') ??
@@ -32,3 +32,4 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.png).*)'],
 };
+

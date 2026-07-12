@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { proxy } from './proxy';
+import { middleware } from './middleware';
 
-describe('public origin proxy', () => {
+describe('public origin middleware', () => {
   it('forces HTTPS on the product subdomain', () => {
-    const response = proxy(new NextRequest('http://app.builiconstruction.com/app?demo=1'));
+    const response = middleware(new NextRequest('http://app.builiconstruction.com/app?demo=1'));
     expect(response.status).toBe(308);
     expect(response.headers.get('location')).toBe(
       'https://app.builiconstruction.com/app?demo=1',
@@ -12,7 +12,7 @@ describe('public origin proxy', () => {
   });
 
   it('canonicalizes www to the HTTPS apex', () => {
-    const response = proxy(new NextRequest('https://www.builiconstruction.com/platform'));
+    const response = middleware(new NextRequest('https://www.builiconstruction.com/platform'));
     expect(response.status).toBe(308);
     expect(response.headers.get('location')).toBe(
       'https://builiconstruction.com/platform',
@@ -20,8 +20,9 @@ describe('public origin proxy', () => {
   });
 
   it('does not rewrite local development', () => {
-    const response = proxy(new NextRequest('http://localhost:3000/app'));
+    const response = middleware(new NextRequest('http://localhost:3000/app'));
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();
   });
 });
+
