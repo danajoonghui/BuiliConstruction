@@ -19,7 +19,13 @@ from sqlalchemy.orm import selectinload
 from .core.config import Settings, get_settings
 from .core.errors import AppError
 from .db import database_ready, get_session
-from .deps import current_user, ensure_org_access, project_for_resource, require_project
+from .deps import (
+    current_user,
+    ensure_org_access,
+    ensure_project_permission,
+    project_for_resource,
+    require_project,
+)
 from .models import (
     AuthSession,
     AuditLog,
@@ -90,10 +96,12 @@ from .schemas import (
     VerifyEmailIn,
 )
 from .security import (
+    DUMMY_PASSWORD_HASH,
     OIDCVerifier,
     hash_password,
     issue_token_pair,
     normalize_email,
+    password_hash_needs_rehash,
     provision_oidc_user,
     slugify,
     token_hash,
@@ -136,6 +144,20 @@ def safe_display_filename(value: str) -> str:
     return cleaned
 
 
+async def ensure_upload_owner_or_admin_access(
+    session: AsyncSession,
+    user: User,
+    upload: Upload,
+) -> None:
+    """Require current scope access and ownership (or organization admin)."""
+    if upload.project_id:
+        await project_for_resource(session, upload.project_id, user, "evidence:create")
+    else:
+        await ensure_org_access(session, user.id, upload.organization_id)
+    if upload.created_by != user.id:
+        await ensure_org_access(session, user.id, upload.organization_id, "admin")
+
+
 async def _token_response(session: AsyncSession, user: User, settings: Settings) -> TokenOut:
     access, refresh, expires = await issue_token_pair(session, user, settings)
     return TokenOut(
@@ -149,18 +171,15 @@ async def _token_response(session: AsyncSession, user: User, settings: Settings)
 def set_auth_cookies(response: Response, token: TokenOut, settings: Settings) -> None:
     csrf = secrets.token_urlsafe(32)
     token.csrf_token = csrf
-    common = {
-        "domain": settings.cookie_domain,
-        "secure": settings.cookie_secure,
-        "samesite": settings.cookie_samesite,
-    }
     response.set_cookie(
         "buili_access",
         token.access_token or "",
         httponly=True,
         path="/",
         max_age=token.expires_in,
-        **common,
+        domain=settings.cookie_domain,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
     )
     response.set_cookie(
         "buili_refresh",
@@ -168,7 +187,9 @@ def set_auth_cookies(response: Response, token: TokenOut, settings: Settings) ->
         httponly=True,
         path="/v1/auth",
         max_age=settings.refresh_token_days * 86400,
-        **common,
+        domain=settings.cookie_domain,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
     )
     response.set_cookie(
         "buili_csrf",
@@ -176,7 +197,9 @@ def set_auth_cookies(response: Response, token: TokenOut, settings: Settings) ->
         httponly=False,
         path="/",
         max_age=settings.refresh_token_days * 86400,
-        **common,
+        domain=settings.cookie_domain,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
     )
 
 
@@ -300,8 +323,14 @@ async def login(
     user = await session.scalar(
         select(User).where(User.email == normalize_email(payload.email)).with_for_update()
     )
-    if user is None or not verify_password(payload.password, user.password_hash) or not user.is_active:
+    password_valid = verify_password(
+        payload.password,
+        user.password_hash if user is not None and user.password_hash else DUMMY_PASSWORD_HASH,
+    )
+    if user is None or not password_valid or not user.is_active:
         raise AppError(401, "INVALID_CREDENTIALS", "Email or password is incorrect")
+    if user.password_hash and password_hash_needs_rehash(user.password_hash):
+        user.password_hash = hash_password(payload.password)
     if settings.require_email_verification and not user.email_verified:
         raise AppError(403, "EMAIL_NOT_VERIFIED", "Verify your email before signing in")
     await bind_database_actor(session, user.id, settings)
@@ -384,10 +413,20 @@ async def logout(
         select(AuthSession).where(AuthSession.refresh_token_hash == token_hash(raw_refresh)).with_for_update()
     ) if raw_refresh else None
     if auth_session and auth_session.revoked_at is None:
+        actor_user_id = auth_session.user_id
+        await bind_database_actor(session, actor_user_id, settings)
         await session.execute(
             update(AuthSession)
             .where(AuthSession.family_id == auth_session.family_id, AuthSession.revoked_at.is_(None))
             .values(revoked_at=utcnow(), revocation_reason="logout")
+        )
+        audit(
+            session,
+            action="USER_LOGGED_OUT",
+            resource_type="auth_session",
+            resource_id=auth_session.id,
+            actor_user_id=actor_user_id,
+            request_id=request.state.request_id,
         )
         await session.commit()
     clear_auth_cookies(response, settings)
@@ -554,6 +593,7 @@ async def verify_email(
     payload: VerifyEmailIn,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ) -> dict:
     record = await session.scalar(
         select(OneTimeAuthToken).where(
@@ -569,6 +609,7 @@ async def verify_email(
     user = await session.scalar(select(User).where(User.id == record.user_id).with_for_update())
     if user is None:
         raise AppError(400, "VERIFY_TOKEN_INVALID", "Email verification token is invalid or expired")
+    await bind_database_actor(session, user.id, settings)
     user.email_verified = True
     record.used_at = utcnow()
     await session.execute(
@@ -580,16 +621,23 @@ async def verify_email(
         )
         .values(used_at=utcnow())
     )
+    audit(
+        session,
+        action="EMAIL_VERIFIED",
+        resource_type="user",
+        resource_id=user.id,
+        actor_user_id=user.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, {"verified": True})
 
 
 @router.get("/v1/auth/csrf")
-async def csrf_token(
-    request: Request,
-    user: User = Depends(current_user),
-) -> dict:
-    del user
+async def csrf_token(request: Request) -> dict:
+    # The double-submit value is not an authentication credential. Exposing
+    # this host-only cookie through the CORS-protected API lets a legitimate
+    # app refresh after the short-lived access cookie has expired.
     token = request.cookies.get("buili_csrf")
     if not token:
         raise AppError(401, "CSRF_TOKEN_UNAVAILABLE", "No browser CSRF session is available")
@@ -762,9 +810,7 @@ async def local_upload_content(
     upload = await session.get(Upload, upload_id)
     if upload is None:
         raise AppError(404, "UPLOAD_NOT_FOUND", "Upload was not found")
-    await ensure_org_access(session, user.id, upload.organization_id)
-    if upload.created_by != user.id:
-        await ensure_org_access(session, user.id, upload.organization_id, "admin")
+    await ensure_upload_owner_or_admin_access(session, user, upload)
     if upload.status != "initiated" or upload.expires_at.replace(tzinfo=timezone.utc) <= utcnow():
         raise AppError(409, "UPLOAD_NOT_WRITABLE", "Upload is expired or no longer writable")
     digest = hashlib.sha256()
@@ -808,10 +854,16 @@ async def complete_upload(
     upload = await session.get(Upload, upload_id)
     if upload is None:
         raise AppError(404, "UPLOAD_NOT_FOUND", "Upload was not found")
-    await ensure_org_access(session, user.id, upload.organization_id)
+    await ensure_upload_owner_or_admin_access(session, user, upload)
     expires_at = upload.expires_at
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if payload.sha256 and upload.sha256 and payload.sha256 != upload.sha256:
+        raise AppError(
+            409,
+            "UPLOAD_CHECKSUM_MISMATCH",
+            "Completion checksum does not match the declared checksum",
+        )
     if upload.status == "complete" and upload.scan_status == "clean":
         return envelope(request, UploadOut.model_validate(upload), idempotent=True)
     if expires_at <= utcnow():
@@ -822,6 +874,8 @@ async def complete_upload(
     if info.size != upload.expected_size:
         raise AppError(409, "UPLOAD_SIZE_MISMATCH", "Stored object does not match the declared size")
     checksum = info.sha256
+    if payload.sha256 and checksum and payload.sha256 != checksum:
+        raise AppError(409, "UPLOAD_CHECKSUM_MISMATCH", "Stored object does not match the completion checksum")
     if upload.sha256 and checksum and upload.sha256 != checksum:
         raise AppError(409, "UPLOAD_CHECKSUM_MISMATCH", "Stored object checksum does not match")
     upload.actual_size = info.size
@@ -857,6 +911,26 @@ async def complete_upload(
     return envelope(request, UploadOut.model_validate(upload), scan_job_id=job.id if job else None)
 
 
+@router.get("/v1/uploads/{upload_id}")
+async def get_upload(
+    upload_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return scan state without exposing an object-storage URL.
+
+    S3 completion is asynchronous: clients poll this resource (or the returned
+    scan job) and may create evidence/revisions only after the clean gate.
+    """
+
+    upload = await session.get(Upload, upload_id)
+    if upload is None:
+        raise AppError(404, "UPLOAD_NOT_FOUND", "Upload was not found")
+    await ensure_upload_owner_or_admin_access(session, user, upload)
+    return envelope(request, UploadOut.model_validate(upload))
+
+
 @router.post("/v1/projects/{project_id}/documents", status_code=201)
 async def create_document(
     payload: DocumentCreate,
@@ -872,6 +946,7 @@ async def create_document(
         **payload.model_dump(),
     )
     session.add(document)
+    await session.flush()
     audit(session, action="DOCUMENT_CREATED", resource_type="document", resource_id=document.id, actor_user_id=user.id, organization_id=project.organization_id, project_id=project.id, request_id=request.state.request_id)
     await session.commit()
     return envelope(
@@ -1082,7 +1157,13 @@ async def create_issue(
     if not number:
         await session.scalar(select(Project.id).where(Project.id == project.id).with_for_update())
         count = int(await session.scalar(select(func.count(Issue.id)).where(Issue.project_id == project.id)) or 0)
-        number = f"BUI-{count + 1:04d}"
+        sequence = count + 1
+        number = f"BUI-{sequence:04d}"
+        while await session.scalar(
+            select(Issue.id).where(Issue.project_id == project.id, Issue.number == number)
+        ):
+            sequence += 1
+            number = f"BUI-{sequence:04d}"
     if await session.scalar(select(Issue.id).where(Issue.project_id == project.id, Issue.number == number)):
         raise AppError(409, "ISSUE_NUMBER_TAKEN", "Issue number already exists in this project")
     issue = Issue(
@@ -1162,7 +1243,7 @@ async def update_issue(
     issue = await session.scalar(select(Issue).where(Issue.id == issue_id).with_for_update())
     if issue is None:
         raise AppError(404, "ISSUE_NOT_FOUND", "Issue was not found")
-    await project_for_resource(session, issue.project_id, user, "issue:update")
+    project = await project_for_resource(session, issue.project_id, user, "issue:update")
     changes = payload.model_dump(exclude_unset=True)
     protected = {"status", "classification", "recommended_action", "evidence_sufficiency", "missing_evidence"}
     if protected & changes.keys():
@@ -1172,6 +1253,15 @@ async def update_issue(
             "Verification, classification, and approval state can be changed only by their dedicated workflows",
             {"fields": sorted(protected & changes.keys())},
         )
+    assignee_id = changes.get("assigned_to")
+    if assignee_id:
+        assignee = await session.get(User, assignee_id)
+        if assignee is None or not assignee.is_active:
+            raise AppError(422, "ASSIGNEE_INVALID", "Assignee must be an active project member")
+        try:
+            await ensure_project_permission(session, assignee.id, project, "project:read")
+        except AppError as exc:
+            raise AppError(422, "ASSIGNEE_INVALID", "Assignee must be an active project member") from exc
     for field, value in changes.items():
         setattr(issue, field, value)
     issue.status = "draft"
@@ -1202,10 +1292,23 @@ async def link_issue_evidence(
     if link is None:
         link = IssueEvidence(issue_id=issue.id, evidence_id=evidence.id, relationship_type=payload.relationship_type)
         session.add(link)
+    else:
+        link.relationship_type = payload.relationship_type
     issue.status = "draft"
     issue.verification_json = {}
     issue.approved_by = None
     issue.approved_at = None
+    audit(
+        session,
+        action="ISSUE_EVIDENCE_LINKED",
+        resource_type="issue",
+        resource_id=issue.id,
+        actor_user_id=user.id,
+        organization_id=issue.organization_id,
+        project_id=issue.project_id,
+        details={"evidence_id": evidence.id, "relationship_type": payload.relationship_type},
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, {"issue_id": issue.id, "evidence_id": evidence.id})
 
@@ -1227,11 +1330,39 @@ async def link_issue_source(
     if document.project_id != issue.project_id:
         raise AppError(409, "SOURCE_SCOPE_MISMATCH", "Source belongs to a different project")
     link = IssueSource(issue_id=issue.id, **payload.model_dump())
-    session.add(link)
+    existing = await session.scalar(
+        select(IssueSource).where(
+            IssueSource.issue_id == issue.id,
+            IssueSource.revision_id == revision.id,
+            IssueSource.page.is_(None) if payload.page is None else IssueSource.page == payload.page,
+        )
+    )
+    if existing:
+        existing.bbox_json = payload.bbox_json
+        existing.quote = payload.quote
+        existing.relationship_type = payload.relationship_type
+        link = existing
+    else:
+        session.add(link)
     issue.status = "draft"
     issue.verification_json = {}
     issue.approved_by = None
     issue.approved_at = None
+    audit(
+        session,
+        action="ISSUE_SOURCE_LINKED",
+        resource_type="issue",
+        resource_id=issue.id,
+        actor_user_id=user.id,
+        organization_id=issue.organization_id,
+        project_id=issue.project_id,
+        details={
+            "revision_id": revision.id,
+            "page": payload.page,
+            "relationship_type": payload.relationship_type,
+        },
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, {"id": link.id, "issue_id": issue.id, "revision_id": revision.id})
 

@@ -4,6 +4,7 @@ import re
 import secrets
 import tempfile
 import uuid
+from ipaddress import ip_address
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,6 +59,21 @@ class Services:
 
 def _json_dumps(value) -> bytes:
     return orjson.dumps(value, option=orjson.OPT_NON_STR_KEYS)
+
+
+def _trusted_client_ip(request: Request, settings: Settings) -> str:
+    candidate = ""
+    if settings.environment == "production":
+        # The origin-secret gate below makes this Cloudflare-injected header
+        # trustworthy. Using the ALB peer address would rate-limit all users as
+        # one client.
+        candidate = request.headers.get("cf-connecting-ip", "").strip()
+    if not candidate and request.client:
+        candidate = request.client.host
+    try:
+        return str(ip_address(candidate))
+    except ValueError:
+        return "unknown"
 
 
 def build_services(settings: Settings) -> Services:
@@ -266,7 +282,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "/v1/auth/reset-password",
         }
         if request.method == "POST" and request.url.path in rate_limited_auth_paths:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = _trusted_client_ip(request, settings)
             allowed = await service_container.rate_limiter.allow(
                 f"{client_ip}:{request.url.path}", settings.auth_rate_limit_per_minute
             )
@@ -307,17 +323,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["X-Request-ID"] = request_id
         return response
 
-    app.add_exception_handler(AppError, app_error_handler)
+    @app.exception_handler(AppError)
+    async def handle_app_error(request: Request, exc: Exception) -> JSONResponse:
+        if not isinstance(exc, AppError):  # pragma: no cover - guarded by Starlette routing
+            raise exc
+        return await app_error_handler(request, exc)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
+        # Pydantic includes the rejected field value in `input`. That can be a
+        # password, reset token, OIDC credential, or other secret and must not
+        # be reflected into responses/log collectors.
+        safe_errors = [
+            {
+                "type": item.get("type", "validation_error"),
+                "loc": item.get("loc", ()),
+                "msg": item.get("msg", "Invalid value"),
+            }
+            for item in exc.errors()
+        ]
         return JSONResponse(
             status_code=422,
             content={
                 "error": {
                     "code": "VALIDATION_ERROR",
                     "message": "Request validation failed",
-                    "details": {"errors": jsonable_encoder(exc.errors())},
+                    "details": {"errors": jsonable_encoder(safe_errors)},
                 },
                 "request_id": getattr(request.state, "request_id", ""),
             },

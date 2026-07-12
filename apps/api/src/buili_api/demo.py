@@ -131,6 +131,7 @@ async def seed_demo(
     document = await session.scalar(
         select(Document).where(Document.project_id == project.id, Document.title == "Electrical Power Plan E1.1")
     )
+    revision: DocumentRevision | None = None
     if document is None:
         document = Document(
             organization_id=organization.id,
@@ -144,7 +145,7 @@ async def seed_demo(
         await session.flush()
         revision = DocumentRevision(
             document_id=document.id,
-            revision="IFC-1",
+            revision="2",
             status="approved",
             storage_key=asset_map.get("cooper-residence-E1.1-demo.pdf", "demo/source-unavailable"),
             content_type="application/pdf",
@@ -162,17 +163,10 @@ async def seed_demo(
         )
         session.add(revision)
         await session.flush()
-        await search.replace_source(
-            session,
-            organization_id=organization.id,
-            project_id=project.id,
-            source_type="document_revision",
-            source_id=revision.id,
-            text=revision.extracted_text,
-            metadata={"title": document.title, "sheet_number": "E1.1", "revision": "IFC-1"},
-        )
     else:
         revision = await session.scalar(select(DocumentRevision).where(DocumentRevision.document_id == document.id))
+    if revision:
+        revision.revision = "2"
     if revision and assets and (assets / "cooper-residence-E1.1-demo.pdf").exists():
         drawing_payload = (assets / "cooper-residence-E1.1-demo.pdf").read_bytes()
         revision.storage_key = asset_map.get(
@@ -180,6 +174,20 @@ async def seed_demo(
         )
         revision.size = len(drawing_payload)
         revision.sha256 = hashlib.sha256(drawing_payload).hexdigest()
+    if revision:
+        await search.replace_source(
+            session,
+            organization_id=organization.id,
+            project_id=project.id,
+            source_type="document_revision",
+            source_id=revision.id,
+            text=revision.extracted_text,
+            metadata={
+                "title": document.title,
+                "sheet_number": "E1.1",
+                "revision": "2",
+            },
+        )
 
     evidence_specs = [
         ("Garage east wall context", "photo", "garage-east-wall-context.png", "Open stud wall near garage entry door; GFCI rough-in visible."),

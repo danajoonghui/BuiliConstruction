@@ -22,11 +22,16 @@ tests; they must not be presented as a real customer project.
 cd apps/api
 py -3.13 -m pip install -e ".[dev]"
 Copy-Item .env.example .env
+$env:PYTHONPATH = (Resolve-Path ../..).Path
 $env:BUILI_DEMO_MODE = "true"
 $env:BUILI_DEMO_EVIDENCE_PATH = "../../buili_demo_evidence"
 alembic upgrade head
 uvicorn buili_api.main:app --reload
 ```
+
+Run ClamAV (the provided Compose stack includes it) before testing new uploads. With the
+scanner disabled, BUILI intentionally keeps uploaded files quarantined instead of treating
+an unscanned file as clean.
 
 ### Web
 

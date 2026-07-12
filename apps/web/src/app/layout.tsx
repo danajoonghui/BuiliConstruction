@@ -3,7 +3,7 @@ import './globals.css';
 import './marketing-corporate.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://builiconstruction.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_PRODUCT_URL || 'https://builiconstruction.com'),
   title: { default: 'BUILI — Construction verification, grounded in evidence', template: '%s — BUILI' },
   description: 'Connect field conditions, drawings, BIM, RFIs, and evidence in one spatial construction verification workflow.',
   applicationName: 'BUILI',
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: 'BUILI — Know what changed. Prove what happened.',
     description: 'Evidence-grounded construction verification from field capture to review-ready action.',
-    images: ['/og-image.svg']
+    images: [{ url: '/brand/hero-renovation-v2.webp', width: 1536, height: 1024, alt: 'BUILI construction verification in the field' }]
   }
 };
 

@@ -123,7 +123,7 @@ class SearchService:
         query_vector = query_embeddings[0] if query_embeddings else None
         if session.get_bind().dialect.name == "postgresql" and query_vector:
             distance = SearchChunk.embedding.cosine_distance(query_vector)
-            semantic = list(
+            semantic_chunks = list(
                 (
                     await session.scalars(
                         statement.where(SearchChunk.embedding.is_not(None))
@@ -138,15 +138,25 @@ class SearchService:
                 lexical_statement = lexical_statement.where(
                     or_(*(SearchChunk.content.ilike(f"%{term}%") for term in terms))
                 )
-            lexical = list((await session.scalars(lexical_statement.limit(250))).all())
-            chunks = list({item.id: item for item in [*semantic, *lexical]}.values())
+            lexical_chunks = list((await session.scalars(lexical_statement.limit(250))).all())
+            chunks = list(
+                {item.id: item for item in [*semantic_chunks, *lexical_chunks]}.values()
+            )
         else:
             chunks = list((await session.scalars(statement.limit(5000))).all())
         scored: list[tuple[float, SearchChunk]] = []
         for chunk in chunks:
-            lexical = lexical_score(query, chunk.content)
-            semantic = cosine(query_vector, list(chunk.embedding)) if query_vector and chunk.embedding else 0.0
-            score = lexical if query_vector is None else semantic * 0.7 + lexical * 0.3
+            lexical_relevance = lexical_score(query, chunk.content)
+            semantic_relevance = (
+                cosine(query_vector, list(chunk.embedding))
+                if query_vector and chunk.embedding
+                else 0.0
+            )
+            score = (
+                lexical_relevance
+                if query_vector is None
+                else semantic_relevance * 0.7 + lexical_relevance * 0.3
+            )
             if score > 0:
                 scored.append((score, chunk))
         scored.sort(key=lambda item: item[0], reverse=True)

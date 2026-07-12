@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError
 from jwt import PyJWKClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,9 @@ from .core.errors import AppError
 from .models import AuthSession, Organization, OrganizationMember, User, new_id, utcnow
 
 password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
+# Equalizes the expensive verification path for unknown and known emails. The
+# value is intentionally not a credential and changes whenever a process boots.
+DUMMY_PASSWORD_HASH = password_hasher.hash("BUILI-login-timing-equalizer-not-a-credential")
 
 
 def normalize_email(value: str) -> str:
@@ -40,7 +43,14 @@ def verify_password(password: str, password_hash: str | None) -> bool:
         return False
     try:
         return password_hasher.verify(password_hash, password)
-    except (VerifyMismatchError, InvalidHashError):
+    except (VerificationError, InvalidHashError):
+        return False
+
+
+def password_hash_needs_rehash(password_hash: str) -> bool:
+    try:
+        return password_hasher.check_needs_rehash(password_hash)
+    except InvalidHashError:
         return False
 
 
@@ -117,20 +127,42 @@ class OIDCVerifier:
         if not self.settings.oidc_client_id:
             raise AppError(503, "OIDC_NOT_CONFIGURED", "Google/OIDC login is not configured")
         issuer = self.settings.oidc_issuer.rstrip("/")
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{issuer}/.well-known/openid-configuration")
-            response.raise_for_status()
-            discovery = response.json()
-        jwks_uri = discovery["jwks_uri"]
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(f"{issuer}/.well-known/openid-configuration")
+                response.raise_for_status()
+                discovery = response.json()
+            discovered_issuer = str(discovery["issuer"]).rstrip("/")
+            if discovered_issuer != issuer:
+                raise ValueError("OIDC discovery issuer does not match configuration")
+            jwks_uri = str(discovery["jwks_uri"])
+            if not jwks_uri.startswith("https://"):
+                raise ValueError("OIDC JWKS URI must use HTTPS")
+            advertised_algorithms = discovery.get(
+                "id_token_signing_alg_values_supported", ["RS256"]
+            )
+            algorithms = [
+                algorithm
+                for algorithm in advertised_algorithms
+                if algorithm in {"RS256", "PS256", "ES256"}
+            ]
+            if not algorithms:
+                raise ValueError("OIDC provider advertises no supported asymmetric algorithm")
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+            raise AppError(
+                503,
+                "OIDC_PROVIDER_UNAVAILABLE",
+                "The identity provider configuration is unavailable",
+            ) from exc
 
         def _decode() -> dict[str, Any]:
             signing_key = PyJWKClient(jwks_uri, cache_keys=True).get_signing_key_from_jwt(id_token)
             return jwt.decode(
                 id_token,
                 signing_key.key,
-                algorithms=discovery.get("id_token_signing_alg_values_supported", ["RS256"]),
+                algorithms=algorithms,
                 audience=self.settings.oidc_client_id,
-                issuer=discovery.get("issuer", issuer),
+                issuer=discovered_issuer,
                 options={"require": ["exp", "iat", "sub"]},
             )
 

@@ -87,10 +87,10 @@ def context() -> ReportContext:
         sources=[
             ReportSource(
                 index=1,
-                revision_id="rev_demo_e11_ifc1",
+                revision_id="rev_demo_e11_2",
                 document_title="Electrical Power Plan E1.1",
                 sheet_number="E1.1",
-                revision="IFC-1",
+                revision="2",
                 status="approved",
                 page=1,
                 quote="Electrical Note 3: Garage receptacle centerline shall be minimum 18 inches above finished floor.",

@@ -107,17 +107,17 @@ class ReportService:
                 )
             ).scalars()
         )
-        source_rows = list(
-            (
-                await session.execute(
-                    select(IssueSource, DocumentRevision, Document)
-                    .join(DocumentRevision, DocumentRevision.id == IssueSource.revision_id)
-                    .join(Document, Document.id == DocumentRevision.document_id)
-                    .where(IssueSource.issue_id == issue.id)
-                    .order_by(Document.title, DocumentRevision.revision, IssueSource.page)
-                )
-            ).all()
+        result = await session.execute(
+            select(IssueSource, DocumentRevision, Document)
+            .join(DocumentRevision, DocumentRevision.id == IssueSource.revision_id)
+            .join(Document, Document.id == DocumentRevision.document_id)
+            .where(IssueSource.issue_id == issue.id)
+            .order_by(Document.title, DocumentRevision.revision, IssueSource.page)
         )
+        source_rows = [
+            (link, revision, document)
+            for link, revision, document in result.tuples().all()
+        ]
         return project, evidence_rows, source_rows
 
     async def _report_context(

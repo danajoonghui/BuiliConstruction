@@ -6,6 +6,7 @@ import { FormEvent, useState } from 'react';
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { authApi, ApiError } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/google-auth';
+import { GoogleMark } from './google-mark';
 
 export function LoginForm() {
   const router = useRouter();
@@ -28,9 +29,9 @@ export function LoginForm() {
 
   return (
     <>
-      <button type="button" className="google-button" onClick={continueWithGoogle}><GoogleMark/> Continue with Google</button>
+      <button type="button" className="google-button" onClick={continueWithGoogle} disabled={loading} aria-busy={loading}><GoogleMark/> Continue with Google</button>
       <div className="auth-divider"><span>or continue with email</span></div>
-      <form className="auth-form" onSubmit={submit}>
+      <form className="auth-form" method="post" action="/login" onSubmit={submit}>
         <label>Email address<input name="email" type="email" autoComplete="email" placeholder="you@company.com" required/></label>
         <label>Password<span className="password-input"><input name="password" type={visible ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter your password" minLength={8} required/><button type="button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide password' : 'Show password'}>{visible ? <EyeOff/> : <Eye/>}</button></span></label>
         <div className="auth-form-row auth-form-row--end"><Link href="/forgot-password">Forgot password?</Link></div>
@@ -43,6 +44,4 @@ export function LoginForm() {
   );
 }
 
-function safeReturnPath() { const value = new URLSearchParams(window.location.search).get('returnTo'); return value?.startsWith('/app') && !value.startsWith('//') ? value : '/app'; }
-
-function GoogleMark() { return <svg aria-hidden width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.7H9v3.2h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.8 2.7-6.4Z"/><path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2L12 13.5c-.8.5-1.8.9-3 .9a5.2 5.2 0 0 1-4.9-3.6h-3v2.3A9 9 0 0 0 9 18Z"/><path fill="#FBBC05" d="M4.1 10.8a5.4 5.4 0 0 1 0-3.5V5h-3A9 9 0 0 0 0 9c0 1.4.3 2.8 1 4l3-2.2Z"/><path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.5 1.4l2.6-2.6A8.7 8.7 0 0 0 9 0a9 9 0 0 0-8 5l3 2.3A5.2 5.2 0 0 1 9 3.6Z"/></svg>; }
+export function safeReturnPath(search=typeof window==='undefined'?'':window.location.search) { const value = new URLSearchParams(search).get('returnTo'); return value && /^\/app(?:[/?#]|$)/.test(value) && !/[\\\u0000-\u001f]/.test(value) ? value : '/app'; }

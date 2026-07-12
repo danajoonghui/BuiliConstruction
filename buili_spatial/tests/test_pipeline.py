@@ -3,9 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import fitz
+import pytest
 
+from buili_spatial.geometry import build_design_glb
 from buili_spatial.io_utils import sha256_file
 from buili_spatial.pipeline import SpatialPipelineError, parse_pdf_to_plan_graph
+
+
+DEMO_PDF = (
+    Path(__file__).resolve().parents[2]
+    / "buili_demo_evidence"
+    / "cooper-residence-E1.1-demo.pdf"
+)
 
 
 def _make_vector_plan(path) -> None:
@@ -75,3 +84,78 @@ def test_pdf_facade_rejects_revision_hash_mismatch(tmp_path) -> None:
         assert exc.code == "SOURCE_HASH_MISMATCH"
     else:  # pragma: no cover
         raise AssertionError("hash mismatch should fail before parsing")
+
+
+def test_demo_plan_graph_and_glb_are_reproducible_and_source_mapped(tmp_path) -> None:
+    source_hash = sha256_file(DEMO_PDF)
+    options = {
+        "project_id": "project_demo",
+        "sheet_id": "E1.1",
+        "source_doc_id": "doc_demo_e11",
+        "source_revision_id": "rev_demo_e11_2",
+        "source_revision": "2",
+        "source_hash": source_hash,
+        "px_per_meter": 100.0,
+        "scale_source": "verified_demo_calibration",
+        "scale_confidence": 0.95,
+        "use_ocr": False,
+    }
+    first = parse_pdf_to_plan_graph(DEMO_PDF, tmp_path / "first", **options)
+    second = parse_pdf_to_plan_graph(DEMO_PDF, tmp_path / "second", **options)
+
+    assert first == second
+    assert first["pipeline"]["deterministic"] is True
+    assert first["provenance"]["source_hash"] == source_hash
+    assert first["provenance"]["source_revision_id"] == "rev_demo_e11_2"
+    assert len(first["rooms"]) == 1
+    assert len(first["walls"]) >= 4
+    assert first["sources"]
+    assert not {
+        row["code"] for row in first["warnings"] if row["severity"] == "error"
+    }
+    for collection in ("rooms", "walls", "openings", "fixtures"):
+        assert all(entity["source_ref_ids"] for entity in first[collection])
+
+    first_uri, first_metadata = build_design_glb(
+        first,
+        "project_demo",
+        "scene_demo",
+        storage_root=tmp_path / "glb-first",
+    )
+    second_uri, second_metadata = build_design_glb(
+        second,
+        "project_demo",
+        "scene_demo",
+        storage_root=tmp_path / "glb-second",
+    )
+    first_glb = (tmp_path / "glb-first" / first_uri).read_bytes()
+    second_glb = (tmp_path / "glb-second" / second_uri).read_bytes()
+    assert first_glb == second_glb
+    assert first_glb[:4] == b"glTF"
+    assert first_metadata == second_metadata
+    assert first_metadata["plan_graph_content_sha256"] == first["pipeline"][
+        "content_sha256"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "code"),
+    [
+        ("page_no", 0, "INVALID_PAGE_NUMBER"),
+        ("px_per_meter", 0.0, "INVALID_SCALE"),
+        ("scale_confidence", 1.01, "INVALID_SCALE_CONFIDENCE"),
+    ],
+)
+def test_pdf_facade_rejects_invalid_spatial_inputs(
+    tmp_path, field: str, value: float, code: str
+) -> None:
+    arguments = {
+        "project_id": "project_demo",
+        "sheet_id": "E1.1",
+        "source_doc_id": "doc_demo_e11",
+        "source_revision_id": "rev_demo_e11_2",
+        field: value,
+    }
+    with pytest.raises(SpatialPipelineError) as captured:
+        parse_pdf_to_plan_graph(DEMO_PDF, tmp_path / "derived", **arguments)
+    assert captured.value.code == code

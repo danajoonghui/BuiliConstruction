@@ -8,6 +8,35 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 T = TypeVar("T")
 
 
+def _password_with_minimum_complexity(value: str) -> str:
+    classes = (
+        any(character.islower() for character in value),
+        any(character.isupper() for character in value),
+        any(character.isdigit() for character in value),
+    )
+    if sum(classes) < 2:
+        raise ValueError("password must contain at least two of lowercase, uppercase, and digits")
+    return value
+
+
+def _canonical_sha256(value: str | None) -> str | None:
+    if value is None:
+        return None
+    lowered = value.lower()
+    if len(lowered) != 64 or any(character not in "0123456789abcdef" for character in lowered):
+        raise ValueError("sha256 must be a 64-character hexadecimal digest")
+    return lowered
+
+
+def _strip_nonblank(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("value must not be blank")
+    return stripped
+
+
 class Envelope(BaseModel, Generic[T]):
     data: T
     request_id: str = ""
@@ -32,31 +61,38 @@ class SignupIn(BaseModel):
     display_name: str = Field(min_length=2, max_length=160)
     organization_name: str | None = Field(default=None, min_length=2, max_length=200)
 
+    @field_validator("display_name", "organization_name")
+    @classmethod
+    def normalize_names(cls, value: str | None) -> str | None:
+        return _strip_nonblank(value)
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str) -> str:
-        classes = (any(c.islower() for c in value), any(c.isupper() for c in value), any(c.isdigit() for c in value))
-        if sum(classes) < 2:
-            raise ValueError("password must contain at least two of lowercase, uppercase, and digits")
-        return value
+        return _password_with_minimum_complexity(value)
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=256)
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str | None = None
+    refresh_token: str | None = Field(default=None, min_length=32, max_length=512)
 
 
 class LogoutIn(BaseModel):
-    refresh_token: str | None = None
+    refresh_token: str | None = Field(default=None, min_length=32, max_length=512)
 
 
 class OIDCExchangeIn(BaseModel):
-    id_token: str
-    organization_name: str | None = None
+    id_token: str = Field(min_length=16, max_length=16_384)
+    organization_name: str | None = Field(default=None, min_length=2, max_length=200)
+
+    @field_validator("organization_name")
+    @classmethod
+    def normalize_organization_name(cls, value: str | None) -> str | None:
+        return _strip_nonblank(value)
 
 
 class TokenOut(BaseModel):
@@ -76,6 +112,11 @@ class ResetPasswordIn(BaseModel):
     token: str = Field(min_length=32, max_length=512)
     new_password: str = Field(min_length=12, max_length=256)
 
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return _password_with_minimum_complexity(value)
+
 
 class VerifyEmailIn(BaseModel):
     token: str = Field(min_length=32, max_length=512)
@@ -91,6 +132,11 @@ class AuthCapabilitiesOut(BaseModel):
 class OrganizationCreate(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     slug: str | None = Field(default=None, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        return _strip_nonblank(value) or ""
 
 
 class OrganizationOut(ORMModel):
@@ -110,12 +156,22 @@ class ProjectCreate(BaseModel):
     units: Literal["imperial", "metric"] = "imperial"
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("name", "code")
+    @classmethod
+    def normalize_identifiers(cls, value: str) -> str:
+        return _strip_nonblank(value) or ""
+
 
 class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=240)
     status: Literal["draft", "setup", "active", "on_hold", "closed", "archived"] | None = None
     address: str | None = None
     metadata_json: dict[str, Any] | None = None
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        return _strip_nonblank(value)
 
 
 class ProjectOut(ORMModel):
@@ -141,6 +197,11 @@ class UploadInitIn(BaseModel):
     size: int = Field(gt=0)
     sha256: str | None = Field(default=None, min_length=64, max_length=64)
 
+    @field_validator("sha256")
+    @classmethod
+    def validate_sha256(cls, value: str | None) -> str | None:
+        return _canonical_sha256(value)
+
 
 class UploadInitOut(BaseModel):
     upload_id: str
@@ -152,6 +213,11 @@ class UploadInitOut(BaseModel):
 
 class UploadCompleteIn(BaseModel):
     sha256: str | None = Field(default=None, min_length=64, max_length=64)
+
+    @field_validator("sha256")
+    @classmethod
+    def validate_sha256(cls, value: str | None) -> str | None:
+        return _canonical_sha256(value)
 
 
 class UploadOut(ORMModel):
@@ -179,6 +245,11 @@ class DocumentCreate(BaseModel):
     ] = "other"
     discipline: str = "general"
 
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        return _strip_nonblank(value) or ""
+
 
 class RevisionCreate(BaseModel):
     upload_id: str
@@ -188,6 +259,11 @@ class RevisionCreate(BaseModel):
     sheet_number: str | None = None
     metadata_json: dict[str, Any] = Field(default_factory=dict)
     process: bool = True
+
+    @field_validator("revision")
+    @classmethod
+    def normalize_revision(cls, value: str) -> str:
+        return _strip_nonblank(value) or ""
 
 
 class RevisionOut(ORMModel):
@@ -228,6 +304,11 @@ class EvidenceCreate(BaseModel):
     transcript: str = ""
     analyze: bool = False
 
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        return _strip_nonblank(value) or ""
+
 
 class EvidenceOut(ORMModel):
     id: str
@@ -258,20 +339,44 @@ class IssueCreate(BaseModel):
     expected_condition: str = ""
     difference: str = ""
     location_json: dict[str, Any] = Field(default_factory=dict)
-    evidence_ids: list[str] = Field(default_factory=list)
-    revision_ids: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=500)
+    revision_ids: list[str] = Field(default_factory=list, max_length=500)
+
+    @field_validator("number")
+    @classmethod
+    def normalize_number(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        return _strip_nonblank(value) or ""
+
+    @field_validator("evidence_ids", "revision_ids")
+    @classmethod
+    def reject_duplicate_links(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("linked resource ids must not contain duplicates")
+        return value
 
 
 class IssueUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str | None = None
     description: str | None = None
-    priority: str | None = None
+    priority: Literal["low", "normal", "high", "critical"] | None = None
     observed_condition: str | None = None
     expected_condition: str | None = None
     difference: str | None = None
-    assigned_to: str | None = None
+    assigned_to: str | None = Field(default=None, max_length=40)
     location_json: dict[str, Any] | None = None
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str | None) -> str | None:
+        return _strip_nonblank(value)
 
 
 class IssueOut(ORMModel):
@@ -303,7 +408,7 @@ class IssueOut(ORMModel):
 
 class IssueLinkEvidenceIn(BaseModel):
     evidence_id: str
-    relationship_type: str = "supports"
+    relationship_type: Literal["supports", "documents", "measurement"] = "supports"
 
 
 class IssueLinkSourceIn(BaseModel):
@@ -311,7 +416,9 @@ class IssueLinkSourceIn(BaseModel):
     page: int | None = None
     bbox_json: list[float] = Field(default_factory=list)
     quote: str = ""
-    relationship_type: str = "requirement"
+    relationship_type: Literal["requirement", "authorization", "conflict", "reference"] = (
+        "requirement"
+    )
 
 
 class JobOut(ORMModel):
@@ -333,6 +440,11 @@ class ReportCreate(BaseModel):
     kind: Literal["rfi", "punch", "change_event", "evidence_package", "model_update_request"] = "rfi"
     title: str | None = None
     approve: bool = False
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str | None) -> str | None:
+        return _strip_nonblank(value)
 
 
 class ReportArtifactOut(ORMModel):

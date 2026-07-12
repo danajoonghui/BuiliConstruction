@@ -106,7 +106,7 @@ variable "external_ai_enabled" {
 variable "openai_model" {
   description = "Pinned model identifier used by the API when external AI is enabled."
   type        = string
-  default     = "gpt-5.6-terra"
+  default     = ""
 }
 
 variable "openai_transcribe_model" {

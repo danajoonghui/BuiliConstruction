@@ -64,7 +64,9 @@ def _structured_measurement(
     evidence: Evidence,
     approved_revision_ids: set[str],
 ) -> dict[str, Any] | None:
-    raw = evidence.metadata_json.get("measurement") if isinstance(evidence.metadata_json.get("measurement"), dict) else evidence.metadata_json
+    metadata = evidence.metadata_json if isinstance(evidence.metadata_json, dict) else {}
+    measurement = metadata.get("measurement")
+    raw: dict[str, Any] = measurement if isinstance(measurement, dict) else metadata
     value = raw.get("observed_value", raw.get("value"))
     unit = str(raw.get("unit") or "").strip().lower()
     source_revision_id = str(raw.get("source_revision_id") or "")

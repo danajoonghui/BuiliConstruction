@@ -10,22 +10,29 @@ from __future__ import annotations
 
 import io
 import re
+import time
+import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
+from html import escape as html_escape
 from typing import Any
 
 from docx import Document as WordDocument
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from PIL import Image as PillowImage
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
-from reportlab.platypus import (
+from reportlab.lib import colors  # type: ignore[import-untyped]
+from reportlab.lib.pagesizes import letter  # type: ignore[import-untyped]
+from reportlab.lib.styles import (  # type: ignore[import-untyped]
+    ParagraphStyle,
+    getSampleStyleSheet,
+)
+from reportlab.lib.units import inch  # type: ignore[import-untyped]
+from reportlab.lib.utils import TimeStamp  # type: ignore[import-untyped]
+from reportlab.platypus import (  # type: ignore[import-untyped]
     Image,
     KeepTogether,
     Paragraph,
@@ -34,6 +41,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from reportlab.pdfgen import canvas as pdf_canvas  # type: ignore[import-untyped]
 
 
 TEMPLATE_VERSION = "buili.issue-pack.v2"
@@ -44,6 +52,24 @@ MUTED = "#667069"
 LINE = "#DDE5E0"
 PALE = "#EFF9F3"
 SOFT = "#F6F8F7"
+
+
+class _InvariantCanvas(pdf_canvas.Canvas):
+    """ReportLab canvas with stable metadata and document identifiers."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        generated_at = kwargs.pop("generated_at")
+        kwargs["invariant"] = 1
+        super().__init__(*args, **kwargs)
+        epoch = generated_at.astimezone(timezone.utc).timestamp()
+        stamp = TimeStamp(invariant=True)
+        stamp.t = epoch
+        stamp.lt = time.gmtime(epoch)
+        stamp.YMDhms = tuple(stamp.lt)[:6]
+        stamp.tzname = "UTC"
+        stamp.dhh = 0
+        stamp.dmm = 0
+        self._doc._timeStamp = stamp
 
 
 @dataclass(slots=True)
@@ -116,10 +142,16 @@ def _label(value: str) -> str:
     return _plain(value).replace("_", " ").upper()
 
 
+def _pdf_plain(value: Any, *, fallback: str = "Not recorded") -> str:
+    """Escape untrusted record text before passing it to ReportLab markup."""
+
+    return html_escape(_plain(value, fallback=fallback), quote=True)
+
+
 def _normalized_image_bytes(value: bytes) -> bytes | None:
     try:
-        with PillowImage.open(io.BytesIO(value)) as image:
-            image = image.convert("RGB")
+        with PillowImage.open(io.BytesIO(value)) as source_image:
+            image = source_image.convert("RGB")
             image.thumbnail((1200, 900))
             output = io.BytesIO()
             image.save(output, format="JPEG", quality=84, optimize=True)
@@ -235,17 +267,29 @@ def render_pdf(context: ReportContext) -> bytes:
     story: list[Any] = [
         header,
         Spacer(1, 0.2 * inch),
-        Paragraph(f"{_label(context.kind)} / {context.issue_number} / V{context.version}", styles["eyebrow"]),
-        Paragraph(_plain(context.title), styles["title"]),
         Paragraph(
-            f"{_plain(context.project_name)} / {_plain(context.project_code)} / {_plain(context.location)}",
+            _pdf_plain(
+                f"{_label(context.kind)} / {context.issue_number} / V{context.version}"
+            ),
+            styles["eyebrow"],
+        ),
+        Paragraph(_pdf_plain(context.title), styles["title"]),
+        Paragraph(
+            " / ".join(
+                _pdf_plain(item)
+                for item in (
+                    context.project_name,
+                    context.project_code,
+                    context.location,
+                )
+            ),
             styles["small"],
         ),
         Spacer(1, 0.16 * inch),
     ]
     facts = [
         [Paragraph("PRIORITY", styles["label"]), Paragraph("CLASSIFICATION", styles["label"]), Paragraph("EVIDENCE", styles["label"]), Paragraph("ISSUE STATUS", styles["label"])],
-        [Paragraph(_label(context.priority), styles["body"]), Paragraph(_label(context.classification), styles["body"]), Paragraph(_label(context.evidence_sufficiency), styles["body"]), Paragraph(_label(context.issue_status), styles["body"])],
+        [Paragraph(_pdf_plain(_label(context.priority)), styles["body"]), Paragraph(_pdf_plain(_label(context.classification)), styles["body"]), Paragraph(_pdf_plain(_label(context.evidence_sufficiency)), styles["body"]), Paragraph(_pdf_plain(_label(context.issue_status)), styles["body"])],
     ]
     story.append(_pdf_table(facts, [1.18 * inch, 2.2 * inch, 1.42 * inch, 1.6 * inch], accent=True))
     story.extend(
@@ -254,14 +298,14 @@ def render_pdf(context: ReportContext) -> bytes:
             _pdf_table(
                 [
                     [Paragraph("OBSERVED", styles["label"]), Paragraph("REQUIRED / EXPECTED", styles["label"]), Paragraph("DIFFERENCE", styles["label"])],
-                    [Paragraph(_plain(context.observed_condition), styles["body"]), Paragraph(_plain(context.expected_condition), styles["body"]), Paragraph(_plain(context.difference), styles["body"])],
+                    [Paragraph(_pdf_plain(context.observed_condition), styles["body"]), Paragraph(_pdf_plain(context.expected_condition), styles["body"]), Paragraph(_pdf_plain(context.difference), styles["body"])],
                 ],
                 [2.04 * inch, 2.18 * inch, 2.18 * inch],
                 header=True,
             ),
             Paragraph("Recommended route", styles["h2"]),
             _pdf_table(
-                [[Paragraph(_label(context.recommended_action), styles["eyebrow"]), Paragraph(_plain(context.difference, fallback="Reviewer confirmation is required before official issue."), styles["body"])]],
+                [[Paragraph(_pdf_plain(_label(context.recommended_action)), styles["eyebrow"]), Paragraph(_pdf_plain(context.difference, fallback="Reviewer confirmation is required before official issue."), styles["body"])]],
                 [1.7 * inch, 4.7 * inch],
                 accent=True,
             ),
@@ -269,30 +313,49 @@ def render_pdf(context: ReportContext) -> bytes:
         ]
     )
     evidence_rows = [[Paragraph("TYPE", styles["label"]), Paragraph("EVIDENCE", styles["label"]), Paragraph("LOCATION / CAPTURE", styles["label"])]]
-    for item in context.evidence:
-        details = _plain(item.description or item.transcript, fallback="Linked evidence")
+    for evidence_item in context.evidence:
+        details = _pdf_plain(
+            evidence_item.description or evidence_item.transcript,
+            fallback="Linked evidence",
+        )
         evidence_rows.append(
             [
-                Paragraph(_label(item.kind), styles["small"]),
-                Paragraph(f"<b>{_plain(item.title)}</b><br/>{details}", styles["small"]),
-                Paragraph(f"{_plain(item.location)}<br/>{_plain(item.captured_at, fallback='Date not recorded')}", styles["small"]),
+                Paragraph(_pdf_plain(_label(evidence_item.kind)), styles["small"]),
+                Paragraph(
+                    f"<b>{_pdf_plain(evidence_item.title)}</b><br/>{details}",
+                    styles["small"],
+                ),
+                Paragraph(
+                    f"{_pdf_plain(evidence_item.location)}<br/>"
+                    f"{_pdf_plain(evidence_item.captured_at, fallback='Date not recorded')}",
+                    styles["small"],
+                ),
             ]
         )
     if len(evidence_rows) == 1:
         evidence_rows.append([Paragraph("-", styles["small"]), Paragraph("No evidence linked.", styles["small"]), Paragraph("-", styles["small"])])
-    story.append(_pdf_table(evidence_rows, [0.92 * inch, 3.62 * inch, 1.86 * inch], header=True))
+    story.append(
+        _pdf_table(
+            evidence_rows,
+            [1.08 * inch, 3.46 * inch, 1.86 * inch],
+            header=True,
+        )
+    )
 
     images: list[Any] = []
-    for item in context.evidence:
-        if not item.image_bytes:
+    for evidence_item in context.evidence:
+        if not evidence_item.image_bytes:
             continue
         try:
-            normalized = _normalized_image_bytes(item.image_bytes)
+            normalized = _normalized_image_bytes(evidence_item.image_bytes)
             if not normalized:
                 continue
             image = Image(io.BytesIO(normalized), width=1.96 * inch, height=1.35 * inch, kind="proportional")
             cell = Table(
-                [[image], [Paragraph(_plain(item.title), styles["small"])]],
+                [
+                    [image],
+                    [Paragraph(_pdf_plain(evidence_item.title), styles["small"])],
+                ],
                 colWidths=[2.06 * inch],
             )
             cell.setStyle(
@@ -327,17 +390,30 @@ def render_pdf(context: ReportContext) -> bytes:
         )
     )
     source_rows = [[Paragraph("#", styles["label"]), Paragraph("DOCUMENT / REVISION", styles["label"]), Paragraph("PAGE", styles["label"]), Paragraph("CITED REQUIREMENT", styles["label"])]]
-    for item in context.sources:
+    for report_source in context.sources:
         source_rows.append(
             [
-                Paragraph(str(item.index), styles["small"]),
+                Paragraph(str(report_source.index), styles["small"]),
                 Paragraph(
-                    f"<b>{_plain(item.sheet_number or item.document_title)}</b> / Rev {_plain(item.revision)} / {_label(item.status)}"
-                    f"<br/>SHA-256: {_plain(item.sha256, fallback='not recorded')}",
+                    f"<b>{_pdf_plain(report_source.sheet_number or report_source.document_title)}</b> / "
+                    f"Rev {_pdf_plain(report_source.revision)} / "
+                    f"{_pdf_plain(_label(report_source.status))}"
+                    f"<br/>SHA-256: {_pdf_plain(report_source.sha256, fallback='not recorded')}",
                     styles["small"],
                 ),
-                Paragraph(str(item.page) if item.page else "-", styles["small"]),
-                Paragraph(_plain(item.quote, fallback="Linked source; exact clause requires reviewer confirmation."), styles["small"]),
+                Paragraph(
+                    str(report_source.page) if report_source.page else "-",
+                    styles["small"],
+                ),
+                Paragraph(
+                    _pdf_plain(
+                        report_source.quote,
+                        fallback=(
+                            "Linked source; exact clause requires reviewer confirmation."
+                        ),
+                    ),
+                    styles["small"],
+                ),
             ]
         )
     if len(source_rows) == 1:
@@ -349,7 +425,7 @@ def render_pdf(context: ReportContext) -> bytes:
             _pdf_table(
                 [
                     [Paragraph("REPORT ID", styles["label"]), Paragraph("VERSION", styles["label"]), Paragraph("GENERATED", styles["label"]), Paragraph("CONTROL", styles["label"])],
-                    [Paragraph(context.report_id, styles["small"]), Paragraph(str(context.version), styles["small"]), Paragraph(context.generated_at.strftime("%Y-%m-%d %H:%M UTC"), styles["small"]), Paragraph(status_label, styles["eyebrow"])],
+                    [Paragraph(_pdf_plain(context.report_id), styles["small"]), Paragraph(str(context.version), styles["small"]), Paragraph(context.generated_at.strftime("%Y-%m-%d %H:%M UTC"), styles["small"]), Paragraph(status_label, styles["eyebrow"])],
                 ],
                 [2.15 * inch, 0.62 * inch, 1.8 * inch, 1.83 * inch],
                 header=True,
@@ -361,7 +437,15 @@ def render_pdf(context: ReportContext) -> bytes:
             ),
         ]
     )
-    doc.build(story, onFirstPage=_pdf_footer, onLaterPages=_pdf_footer)
+    def canvasmaker(*args: Any, **kwargs: Any) -> _InvariantCanvas:
+        return _InvariantCanvas(*args, generated_at=context.generated_at, **kwargs)
+
+    doc.build(
+        story,
+        onFirstPage=_pdf_footer,
+        onLaterPages=_pdf_footer,
+        canvasmaker=canvasmaker,
+    )
     return output.getvalue()
 
 
@@ -480,10 +564,43 @@ def _page_field(paragraph) -> None:
     _word_font(run, size=8, color=MUTED)
 
 
+def _canonicalize_ooxml_zip(payload: bytes) -> bytes:
+    """Normalize OOXML ZIP ordering and timestamps for reproducible hashes."""
+
+    source = io.BytesIO(payload)
+    output = io.BytesIO()
+    with zipfile.ZipFile(source, "r") as archive, zipfile.ZipFile(
+        output,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as normalized:
+        for name in sorted(archive.namelist()):
+            original = archive.getinfo(name)
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 0
+            info.external_attr = original.external_attr
+            normalized.writestr(
+                info,
+                archive.read(name),
+                compress_type=zipfile.ZIP_DEFLATED,
+                compresslevel=9,
+            )
+    return output.getvalue()
+
+
 def render_docx(context: ReportContext) -> bytes:
     """Render the editable companion using the rfi_response business-brief preset."""
 
     document = WordDocument()
+    properties = document.core_properties
+    properties.title = context.title
+    properties.subject = f"{context.kind} issue package {context.issue_number}"
+    properties.author = "BUILI"
+    generated_at = context.generated_at.astimezone(timezone.utc).replace(tzinfo=None)
+    properties.created = generated_at
+    properties.modified = generated_at
     section = document.sections[0]
     section.page_width = Inches(8.5)
     section.page_height = Inches(11)
@@ -518,13 +635,18 @@ def render_docx(context: ReportContext) -> bytes:
     header_paragraph.paragraph_format.space_after = Pt(0)
     _word_font(header_paragraph.add_run("BUILI  /  CONSTRUCTION VERIFICATION"), size=8, color=MUTED, bold=True)
     footer = section.footer
-    footer_table = footer.add_table(rows=1, cols=2, width=Inches(6.5))
-    _table_geometry(footer_table, [6800, 2560])
-    _set_cell(footer_table.cell(0, 0), "SOURCE-CITED REVIEW RECORD", size=7.5, color=MUTED)
-    page_paragraph = footer_table.cell(0, 1).paragraphs[0]
-    page_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _word_font(page_paragraph.add_run("Page "), size=8, color=MUTED)
-    _page_field(page_paragraph)
+    footer_paragraph = footer.paragraphs[0]
+    footer_paragraph.paragraph_format.space_after = Pt(0)
+    footer_paragraph.paragraph_format.tab_stops.add_tab_stop(
+        Inches(6.5), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.SPACES
+    )
+    _word_font(
+        footer_paragraph.add_run("SOURCE-CITED REVIEW RECORD"),
+        size=7.5,
+        color=MUTED,
+    )
+    _word_font(footer_paragraph.add_run("\tPage "), size=8, color=MUTED)
+    _page_field(footer_paragraph)
 
     _word_paragraph(document, _label(context.kind), size=8.5, color=GREEN_DARK, bold=True, after=3)
     _word_paragraph(document, context.title, size=26, bold=True, after=5)
@@ -561,19 +683,34 @@ def render_docx(context: ReportContext) -> bytes:
         ]
         for item in context.evidence
     ] or [["-", "No evidence linked", "-"]]
-    _word_table(document, ["Type", "Evidence", "Location / capture"], evidence_rows, [1300, 5100, 2960])
+    _word_table(
+        document,
+        ["Type", "Evidence", "Location / capture"],
+        evidence_rows,
+        [1600, 4800, 2960],
+    )
     image_evidence = [item for item in context.evidence if item.image_bytes]
     if image_evidence:
         document.add_heading("Field image review", level=2)
         for item in image_evidence[:6]:
-            normalized = _normalized_image_bytes(item.image_bytes)
+            raw_image = item.image_bytes
+            if raw_image is None:
+                continue
+            normalized = _normalized_image_bytes(raw_image)
             if not normalized:
                 continue
             picture = document.add_paragraph()
             picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
             picture.paragraph_format.space_before = Pt(4)
             picture.paragraph_format.space_after = Pt(3)
-            picture.add_run().add_picture(io.BytesIO(normalized), width=Inches(4.8))
+            shape = picture.add_run().add_picture(
+                io.BytesIO(normalized), width=Inches(4.8)
+            )
+            shape._inline.docPr.set(
+                "descr",
+                _plain(f"{item.title}. {item.location}")[:255],
+            )
+            shape._inline.docPr.set("title", _plain(item.title)[:255])
             _word_paragraph(
                 document,
                 f"{item.title} / {item.location}",
@@ -619,4 +756,4 @@ def render_docx(context: ReportContext) -> bytes:
     )
     output = io.BytesIO()
     document.save(output)
-    return output.getvalue()
+    return _canonicalize_ooxml_zip(output.getvalue())

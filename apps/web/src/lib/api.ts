@@ -38,7 +38,7 @@ export async function primeCsrfToken():Promise<string> {
 
 export function clearCsrfToken(){csrfToken='';csrfRequest=null}
 
-function csrfExempt(path:string){return ['/auth/login','/auth/signup','/auth/oidc/exchange','/auth/forgot-password','/auth/refresh'].includes(path)}
+function csrfExempt(path:string){return ['/auth/login','/auth/signup','/auth/oidc/exchange','/auth/forgot-password'].includes(path)}
 
 async function secureHeaders(path:string,method:string,headers:Headers){
   if (['GET','HEAD','OPTIONS'].includes(method)||typeof window==='undefined'||csrfExempt(path)) return;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,30 @@ class SpatialPipelineError(RuntimeError):
             "retryable": self.retryable,
             "details": self.details,
         }
+
+
+def _stable_scene_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Return only reproducible scene-build metadata for the immutable graph.
+
+    Wall-clock timings belong in worker telemetry, not in a content-addressed
+    PlanGraph. Persisting them made identical source PDFs produce different
+    ``content_sha256`` values and therefore different immutable scene records.
+    """
+
+    def without_timings(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: without_timings(item)
+                for key, item in value.items()
+                if key != "stages"
+                and key != "seconds"
+                and not key.endswith("_seconds")
+            }
+        if isinstance(value, list):
+            return [without_timings(item) for item in value]
+        return copy.deepcopy(value)
+
+    return without_timings(metadata)
 
 
 def parse_pdf_to_plan_graph(
@@ -135,7 +160,7 @@ def parse_pdf_to_plan_graph(
         }
         payload["provenance"] = provenance
         payload["extraction"].update(provenance)
-        payload["extraction"]["scene_build"] = scene_metadata
+        payload["extraction"]["scene_build"] = _stable_scene_metadata(scene_metadata)
         return finalize_plan_graph_payload(payload)
     except SpatialPipelineError:
         raise

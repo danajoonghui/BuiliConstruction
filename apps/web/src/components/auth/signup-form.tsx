@@ -6,6 +6,7 @@ import { FormEvent, useState } from 'react';
 import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { authApi, ApiError } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/google-auth';
+import { GoogleMark } from './google-mark';
 
 export function SignupForm() {
   const router = useRouter(); const [loading, setLoading] = useState(false); const [error, setError] = useState('');
@@ -22,6 +23,8 @@ export function SignupForm() {
       <button
         type="button"
         className="google-button"
+        disabled={loading}
+        aria-busy={loading}
         onClick={async () => {
           setLoading(true);
           setError('');
@@ -30,13 +33,13 @@ export function SignupForm() {
           finally { setLoading(false); }
         }}
       >
-        <span className="google-g">G</span> Sign up with Google
+        <GoogleMark/> Sign up with Google
       </button>
       <div className="auth-divider"><span>or use your work email</span></div>
-      <form className="auth-form" onSubmit={submit}>
+      <form className="auth-form" method="post" action="/signup" onSubmit={submit}>
         <div className="field-pair"><label>Full name<input name="name" autoComplete="name" placeholder="Jordan Cho" required/></label><label>Company<input name="organization" autoComplete="organization" placeholder="Northstar Builders" required/></label></div>
         <label>Work email<input name="email" type="email" autoComplete="email" placeholder="you@company.com" required/></label>
-        <label>Password<input name="password" type="password" autoComplete="new-password" placeholder="At least 12 characters" minLength={12} required/><small>Use 12+ characters with a number and symbol.</small></label>
+        <label>Password<input name="password" type="password" autoComplete="new-password" placeholder="At least 12 characters" minLength={12} pattern="(?=.*[0-9])(?=.*[^A-Za-z0-9]).{12,}" title="Use at least 12 characters with a number and symbol" required/><small>Use 12+ characters with a number and symbol.</small></label>
         {error && <p role="alert" className="form-error">{error}</p>}
         <button className="button button--primary button--large button--full" disabled={loading}>{loading ? <><LoaderCircle className="spin"/> Creating workspace...</> : <>Create account <ArrowRight size={16}/></>}</button>
       </form>

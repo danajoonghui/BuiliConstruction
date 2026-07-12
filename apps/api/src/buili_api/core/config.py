@@ -85,7 +85,9 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("OPENAI_API_KEY", "BUILI_OPENAI_API_KEY")
     )
-    openai_model: str = Field(default="gpt-5.6-terra", validation_alias="OPENAI_MODEL")
+    # Model IDs are deliberately deployment-supplied. A made-up or stale
+    # library default must never silently reach a production provider call.
+    openai_model: str = Field(default="", validation_alias="OPENAI_MODEL")
     openai_transcribe_model: str = Field(default="gpt-4o-transcribe", validation_alias="OPENAI_TRANSCRIBE_MODEL")
     openai_embedding_model: str = Field(default="text-embedding-3-small", validation_alias="OPENAI_EMBEDDING_MODEL")
     external_ai_enabled: bool = Field(default=False, validation_alias="BUILI_EXTERNAL_AI_ENABLED")
@@ -111,8 +113,11 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_secure_runtime(self) -> "Settings":
         if self.environment == "production":
-            if self.jwt_secret.get_secret_value().startswith("local-dev"):
-                raise ValueError("BUILI_JWT_SECRET must be set in production")
+            jwt_secret = self.jwt_secret.get_secret_value()
+            normalized_secret = jwt_secret.lower()
+            placeholder_markers = ("local-dev", "replace-with", "change-me", "changeme", "example")
+            if len(jwt_secret) < 32 or any(marker in normalized_secret for marker in placeholder_markers):
+                raise ValueError("BUILI_JWT_SECRET must be an independent secret of at least 32 characters")
             if self.demo_mode:
                 raise ValueError("BUILI_DEMO_MODE is forbidden in production")
             if self.auto_create_schema:
@@ -123,12 +128,29 @@ class Settings(BaseSettings):
                 raise ValueError("Log email backend is forbidden in production")
             if self.require_email_verification and self.email_backend == "disabled":
                 raise ValueError("Verified production accounts require an enabled email backend")
-            if not self.origin_verify_secret or not self.origin_verify_secret.get_secret_value():
-                raise ValueError("BUILI_ORIGIN_VERIFY_SECRET must be set in production")
+            origin_secret = (
+                self.origin_verify_secret.get_secret_value() if self.origin_verify_secret else ""
+            )
+            if len(origin_secret) < 32:
+                raise ValueError(
+                    "BUILI_ORIGIN_VERIFY_SECRET must be an independent secret of at least 32 characters"
+                )
+            if not self.public_api_url.startswith("https://") or not self.frontend_url.startswith(
+                "https://"
+            ):
+                raise ValueError("Production public API and frontend URLs must use HTTPS")
+            if any(not origin.startswith("https://") for origin in self.cors_origin_list):
+                raise ValueError("Production CORS origins must use HTTPS")
             if self.malware_scanner_backend != "clamav":
                 raise ValueError("Production uploads require BUILI_MALWARE_SCANNER_BACKEND=clamav")
             if self.cookie_domain:
                 raise ValueError("Production auth cookies must be host-only; do not set BUILI_COOKIE_DOMAIN")
+            if not self.database_url.startswith("postgresql+asyncpg://"):
+                raise ValueError("Production requires PostgreSQL through a postgresql+asyncpg DATABASE_URL")
+            if self.storage_backend != "s3":
+                raise ValueError("Production requires BUILI_STORAGE_BACKEND=s3")
+            if self.job_backend != "sqs":
+                raise ValueError("Production requires BUILI_JOB_BACKEND=sqs")
             forbidden_origins = {"https://builiconstruction.com", "https://www.builiconstruction.com"}
             if forbidden_origins & set(self.cors_origin_list):
                 raise ValueError("Marketing apex/www origins cannot receive credentialed API CORS")
@@ -138,6 +160,13 @@ class Settings(BaseSettings):
             raise ValueError("BUILI_S3_BUCKET is required for S3 storage")
         if self.job_backend == "sqs" and not self.sqs_queue_url:
             raise ValueError("BUILI_SQS_QUEUE_URL is required for SQS jobs")
+        if self.external_ai_enabled:
+            if not self.openai_api_key:
+                raise ValueError("OPENAI_API_KEY is required when BUILI_EXTERNAL_AI_ENABLED=true")
+            if not self.openai_model.strip():
+                raise ValueError("OPENAI_MODEL must be explicitly pinned when external AI is enabled")
+            if not self.openai_transcribe_model.strip() or not self.openai_embedding_model.strip():
+                raise ValueError("OpenAI transcription and embedding model IDs must be explicitly pinned")
         if not 5 <= self.job_heartbeat_seconds < self.job_visibility_timeout_seconds:
             raise ValueError("Job heartbeat must be at least 5 seconds and lower than the visibility timeout")
         return self

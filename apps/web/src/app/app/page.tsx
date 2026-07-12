@@ -40,7 +40,7 @@ export default function OverviewPage() {
             <Image src="/demo/box-elevation-measurement-thumb.webp" alt="Tape measurement beside garage GFCI box" width={800} height={600}/>
             <div className="latest-evidence__overlay"><span>3 photos · 1 voice note</span><b>Garage east wall</b><small>Captured by Mike Alvarez · 18 min ago</small></div>
           </Link>:<div className="live-placeholder live-placeholder--image"><Camera/><p><b>No capture selected.</b><span>The latest spatially linked evidence will appear here.</span></p><Link href="/app/capture">Capture evidence</Link></div>}
-          <div className="section-heading overview-gap"><h2>Recent activity</h2><button><MoreHorizontal/></button></div>
+          <div className="section-heading overview-gap"><h2>Recent activity</h2><button disabled title="Activity filters are not configured" aria-label="Additional activity actions"><MoreHorizontal/></button></div>
           {demo?<div className="activity-list">
             <Activity icon={<FileCheck2/>} title="Jordan marked BUI-1042 ready for review" time="18 min ago"/>
             <Activity icon={<Upload/>} title="Mike uploaded three field photos" time="24 min ago"/>

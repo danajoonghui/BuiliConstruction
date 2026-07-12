@@ -12,9 +12,14 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 Copy-Item .env.example .env
+$env:PYTHONPATH = (Resolve-Path ../..).Path
 alembic upgrade head
 uvicorn buili_api.main:app --reload
 ```
+
+For upload testing, run the Compose-provided ClamAV service and set
+`BUILI_MALWARE_SCANNER_BACKEND=clamav`. A disabled scanner is fail-closed: uploads stay
+quarantined and cannot become document or evidence sources.
 
 OpenAPI is at `http://localhost:8000/docs`. Health endpoints are `/health/live` and
 `/health/ready`.
@@ -52,7 +57,9 @@ Authenticate with `POST /v1/auth/login` using `BUILI_DEMO_EMAIL` and
 
 ## Production requirements
 
-- Set a strong `BUILI_JWT_SECRET`, PostgreSQL `BUILI_DATABASE_URL`, private S3 bucket, and SQS.
+- Set independent random values of at least 32 characters for `BUILI_JWT_SECRET` and
+  `BUILI_ORIGIN_VERIFY_SECRET`, plus PostgreSQL `BUILI_DATABASE_URL`, a private S3 bucket,
+  and SQS. Production startup rejects HTTP public/frontend URLs and non-HTTPS CORS origins.
 - Use separate `buili_api`, `buili_worker`, and `buili_migrator` database URLs. Never inject
   `BUILI_WORKER_DATABASE_URL` into the API task; worker RLS bypass depends on PostgreSQL
   `current_user`, not a caller-controlled session setting.
@@ -75,6 +82,9 @@ PDF/archive/image validation, and a real ClamAV INSTREAM verdict. Signature chec
 unavailable scanner never mark a file clean. Objects become available to document/evidence
 workflows only after `scan_status` is `clean`. S3 downloads are forced to attachment; local
 downloads add `nosniff` and sandbox CSP.
+For S3 uploads, `POST /v1/uploads/{id}/complete` returns `meta.scan_job_id`; poll that job or
+`GET /v1/uploads/{id}` and create evidence/revisions only after the upload reports
+`status=complete` and `scan_status=clean`.
 
 Spatial jobs invoke `buili_spatial.pipeline.parse_pdf_to_plan_graph`, persist the full immutable
 `buili.plan-graph.v2` contract, and version both PlanGraph and SpatialScene against the exact

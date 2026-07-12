@@ -137,6 +137,35 @@ async def test_document_evidence_issue_report_and_rag(client, account):
     )
     assert issue_response.status_code == 201, issue_response.text
     issue_id = issue_response.json()["data"]["id"]
+    relinked_evidence = await client.post(
+        f"/v1/issues/{issue_id}/evidence",
+        headers=headers,
+        json={"evidence_id": photo_id, "relationship_type": "documents"},
+    )
+    assert relinked_evidence.status_code == 201, relinked_evidence.text
+    first_source = await client.post(
+        f"/v1/issues/{issue_id}/sources",
+        headers=headers,
+        json={
+            "revision_id": revision_id,
+            "quote": "E1.1 Note 3 requires a minimum 18-inch centerline.",
+            "relationship_type": "requirement",
+        },
+    )
+    assert first_source.status_code == 201, first_source.text
+    second_source = await client.post(
+        f"/v1/issues/{issue_id}/sources",
+        headers=headers,
+        json={
+            "revision_id": revision_id,
+            "quote": "E1.1 Note 3: garage receptacle centerline minimum 18 inches AFF.",
+            "relationship_type": "requirement",
+        },
+    )
+    assert second_source.status_code == 201, second_source.text
+    assert second_source.json()["data"]["id"] == first_source.json()["data"]["id"]
+    detail_after_relink = await client.get(f"/v1/issues/{issue_id}", headers=headers)
+    assert len(detail_after_relink.json()["data"]["sources"]) == 1
     analyzed = await client.post(f"/v1/issues/{issue_id}/analyze", headers=headers)
     assert analyzed.status_code == 202, analyzed.text
     await client._transport.app.state.services.jobs.queue.join()
@@ -203,6 +232,9 @@ async def test_document_evidence_issue_report_and_rag(client, account):
     assert answer.status_code == 200, answer.text
     assert answer.json()["data"]["provider"] == "disabled"
     assert answer.json()["data"]["citations"]
+    audit = await client.get(f"/v1/projects/{project_id}/audit", headers=headers)
+    actions = {item["action"] for item in audit.json()["data"]}
+    assert {"ISSUE_EVIDENCE_LINKED", "ISSUE_SOURCE_LINKED"}.issubset(actions)
 
 
 async def test_cross_tenant_project_is_forbidden(client, account):

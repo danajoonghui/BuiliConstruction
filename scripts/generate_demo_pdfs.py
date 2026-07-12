@@ -6,12 +6,15 @@ the contractual note can be reviewed, versioned, and reproduced.
 
 from __future__ import annotations
 
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import TABLOID, letter, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.lib.utils import TimeStamp
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import (
     Image,
@@ -38,7 +41,24 @@ PALE = colors.HexColor("#EFF9F3")
 
 def _drawing_pdf(path: Path) -> None:
     width, height = landscape(TABLOID)
-    c = canvas.Canvas(str(path), pagesize=(width, height), pageCompression=1)
+    c = canvas.Canvas(
+        str(path),
+        pagesize=(width, height),
+        pageCompression=1,
+        invariant=1,
+    )
+    issued_at = datetime(2026, 7, 9, tzinfo=timezone.utc).timestamp()
+    stamp = TimeStamp(invariant=True)
+    stamp.t = issued_at
+    stamp.lt = time.gmtime(issued_at)
+    stamp.YMDhms = tuple(stamp.lt)[:6]
+    stamp.tzname = "UTC"
+    stamp.dhh = 0
+    stamp.dmm = 0
+    c._doc._timeStamp = stamp
+    c.setTitle("Cooper Residence Renovation - Electrical Power Plan E1.1")
+    c.setAuthor("Northstar Builders / BUILI synthetic demo")
+    c.setSubject("Revision 2 synthetic demo contract document")
     margin = 0.42 * inch
     title_h = 0.76 * inch
 

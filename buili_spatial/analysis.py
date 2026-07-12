@@ -364,7 +364,10 @@ def _document_analysis(path: Path) -> MediaAnalysisResult:
     sheet_numbers = sorted(
         set(
             re.findall(
-                r"\b(?:A|M|E|P|FP|S|C)-?\d{2,4}(?:\.\d+)?\b", normalized_text, re.I
+                r"(?<![A-Z0-9])(?:FP|FA|ID|EL|ME|PL|[AMEPSCLG])-?\d{1,4}"
+                r"(?:\.\d{1,3})?(?![A-Z0-9])",
+                normalized_text,
+                re.I,
             )
         )
     )[:500]
@@ -372,7 +375,17 @@ def _document_analysis(path: Path) -> MediaAnalysisResult:
         set(
             match.group(1).strip()
             for match in re.finditer(
-                r"\b(?:REV(?:ISION)?|ISSUED\s+FOR)\s*[:#-]?\s*([^\n]{1,40})",
+                r"\b(?:REVISION|REV)\b\s*[:#-]?\s*([A-Z0-9][A-Z0-9._-]{0,39})",
+                normalized_text,
+                re.I,
+            )
+        )
+    )[:100]
+    issue_statuses = sorted(
+        set(
+            match.group(1).strip()
+            for match in re.finditer(
+                r"\bISSUED\s+FOR\s+([A-Z][A-Z ]{1,40}?)(?=\s*(?:[|;\n]|$))",
                 normalized_text,
                 re.I,
             )
@@ -384,6 +397,7 @@ def _document_analysis(path: Path) -> MediaAnalysisResult:
             "line_count": normalized_text.count("\n") + bool(normalized_text),
             "sheet_number_candidates": sheet_numbers,
             "revision_candidates": revisions,
+            "issue_status_candidates": issue_statuses,
             "external_requirement_analysis": "not_run",
         }
     )

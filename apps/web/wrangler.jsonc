@@ -5,7 +5,8 @@
   "workers_dev": false,
   "routes": [
     { "pattern": "builiconstruction.com", "custom_domain": true },
-    { "pattern": "www.builiconstruction.com", "custom_domain": true }
+    { "pattern": "www.builiconstruction.com", "custom_domain": true },
+    { "pattern": "app.builiconstruction.com", "custom_domain": true }
   ],
   "compatibility_date": "2026-07-12",
   "compatibility_flags": ["nodejs_compat"],

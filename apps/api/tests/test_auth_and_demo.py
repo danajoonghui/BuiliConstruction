@@ -83,11 +83,18 @@ async def test_production_origin_verification_header():
         BUILI_JWT_SECRET="production-test-secret-that-is-over-thirty-two-characters",
         BUILI_AUTO_CREATE_SCHEMA="false",
         BUILI_COOKIE_SECURE="true",
-        BUILI_ORIGIN_VERIFY_SECRET="cloudflare-only-secret",
+        BUILI_ORIGIN_VERIFY_SECRET="cloudflare-only-secret-that-is-long-enough",
         BUILI_DEMO_MODE="false",
         BUILI_EMAIL_BACKEND="disabled",
         BUILI_MALWARE_SCANNER_BACKEND="clamav",
         BUILI_CORS_ORIGINS="https://app.builiconstruction.com",
+        BUILI_PUBLIC_API_URL="https://api.builiconstruction.com",
+        BUILI_FRONTEND_URL="https://app.builiconstruction.com",
+        BUILI_DATABASE_URL="postgresql+asyncpg://api:secret@db.internal/buili",
+        BUILI_STORAGE_BACKEND="s3",
+        BUILI_S3_BUCKET="buili-production-objects",
+        BUILI_JOB_BACKEND="sqs",
+        BUILI_SQS_QUEUE_URL="https://sqs.us-west-1.amazonaws.com/123456789012/buili-jobs",
     )
     guarded_app = create_app(production)
     transport = httpx.ASGITransport(app=guarded_app, raise_app_exceptions=False)
@@ -101,7 +108,7 @@ async def test_production_origin_verification_header():
 
         accepted = await guarded.get(
             "/v1/auth/capabilities",
-            headers={"X-Buili-Origin-Verify": "cloudflare-only-secret"},
+            headers={"X-Buili-Origin-Verify": "cloudflare-only-secret-that-is-long-enough"},
         )
         assert accepted.status_code == 200
 
@@ -110,7 +117,7 @@ async def test_production_origin_verification_header():
             headers={
                 "Origin": "https://builiconstruction.com",
                 "Access-Control-Request-Method": "POST",
-                "X-Buili-Origin-Verify": "cloudflare-only-secret",
+                "X-Buili-Origin-Verify": "cloudflare-only-secret-that-is-long-enough",
             },
         )
         assert apex.headers.get("access-control-allow-origin") is None
@@ -119,7 +126,7 @@ async def test_production_origin_verification_header():
             headers={
                 "Origin": "https://app.builiconstruction.com",
                 "Access-Control-Request-Method": "POST",
-                "X-Buili-Origin-Verify": "cloudflare-only-secret",
+                "X-Buili-Origin-Verify": "cloudflare-only-secret-that-is-long-enough",
             },
         )
         assert product.headers.get("access-control-allow-origin") == "https://app.builiconstruction.com"
