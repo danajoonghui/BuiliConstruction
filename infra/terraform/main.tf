@@ -828,7 +828,7 @@ resource "aws_ecs_task_definition" "worker" {
         "awslogs-stream-prefix" = "worker"
       }
     }
-  }, {
+    }, {
     name              = "clamav"
     image             = var.clamav_image
     essential         = true
