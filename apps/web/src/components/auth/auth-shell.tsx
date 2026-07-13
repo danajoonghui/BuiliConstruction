@@ -8,7 +8,7 @@ export function AuthShell({ children, title, description }: { children: React.Re
       <section className="auth-form-side">
         <div className="auth-top"><Brand/><Link href="/" className="auth-back"><ArrowLeft size={15}/> Back to BUILI</Link></div>
         <div className="auth-form-wrap"><h1>{title}</h1><p>{description}</p>{children}</div>
-        <p className="auth-legal">By continuing, you agree to BUILI&apos;s Terms and acknowledge the Privacy Policy.</p>
+        <p className="auth-legal">By continuing, you agree to BUILI&apos;s <Link href="/terms">Terms</Link> and acknowledge the <Link href="/privacy">Privacy Policy</Link>.</p>
       </section>
       <aside className="auth-context" aria-label="BUILI product benefits">
         <div className="auth-context-plan" aria-hidden>

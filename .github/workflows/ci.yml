@@ -55,7 +55,7 @@ jobs:
       - run: python -m ruff check buili_spatial apps/api/src apps/api/tests
       - run: python -m mypy --config-file apps/api/pyproject.toml apps/api/src/buili_api
       - run: python -m pip check
-      - run: python -m pytest buili_spatial/tests apps/api/tests -q
+      - run: python -m pytest -c apps/api/pyproject.toml buili_spatial/tests apps/api/tests -q
       - name: Bootstrap disposable PostgreSQL roles
         working-directory: apps/api
         run: python scripts/prepare_ci_postgres.py bootstrap

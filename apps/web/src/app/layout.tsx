@@ -4,7 +4,7 @@ import './marketing-corporate.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_PRODUCT_URL || 'https://builiconstruction.com'),
-  title: { default: 'BUILI — Construction verification, grounded in evidence', template: '%s — BUILI' },
+  title: { default: 'BUILI', template: '%s — BUILI' },
   description: 'Connect field conditions, drawings, BIM, RFIs, and evidence in one spatial construction verification workflow.',
   applicationName: 'BUILI',
   icons: { icon: '/favicon.png', apple: '/favicon.png' },

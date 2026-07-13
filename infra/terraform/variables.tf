@@ -121,6 +121,23 @@ variable "openai_embedding_model" {
   default     = "text-embedding-3-small"
 }
 
+variable "tripo_enabled" {
+  description = "Explicit production kill switch for generated presentation assets. The key is injected only when enabled."
+  type        = bool
+  default     = false
+}
+
+variable "tripo_model_version" {
+  description = "Pinned Tripo model version used for fixture-asset generation."
+  type        = string
+  default     = "P1-20260311"
+
+  validation {
+    condition     = !var.tripo_enabled || length(trimspace(var.tripo_model_version)) > 0
+    error_message = "tripo_model_version must be pinned when Tripo generation is enabled."
+  }
+}
+
 variable "cloudflare_ipv4_cidrs" {
   description = "Cloudflare proxy IPv4 ranges allowed to reach the public ALB. Keep synchronized with https://www.cloudflare.com/ips/."
   type        = list(string)

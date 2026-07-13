@@ -32,6 +32,7 @@ from .models import (
     Document,
     DocumentRevision,
     Evidence,
+    FixtureAsset,
     Issue,
     IssueEvidence,
     IssueSource,
@@ -58,6 +59,9 @@ from .schemas import (
     DocumentOut,
     EvidenceCreate,
     EvidenceOut,
+    FixtureAssetGenerateIn,
+    FixtureAssetOut,
+    FixtureAssetReviewIn,
     ForgotPasswordIn,
     IssueCreate,
     IssueLinkEvidenceIn,
@@ -119,7 +123,9 @@ def envelope(request: Request, data: Any, **meta: Any) -> dict[str, Any]:
     if hasattr(data, "model_dump"):
         data = data.model_dump(mode="json")
     elif isinstance(data, list):
-        data = [item.model_dump(mode="json") if hasattr(item, "model_dump") else item for item in data]
+        data = [
+            item.model_dump(mode="json") if hasattr(item, "model_dump") else item for item in data
+        ]
     return {"data": data, "request_id": request.state.request_id, "meta": meta}
 
 
@@ -137,7 +143,9 @@ async def bind_database_actor(session: AsyncSession, user_id: str, settings: Set
 
 def safe_display_filename(value: str) -> str:
     basename = value.replace("\\", "/").rsplit("/", 1)[-1].strip()
-    cleaned = "".join(character for character in basename if character.isalnum() or character in " ._()-")
+    cleaned = "".join(
+        character for character in basename if character.isalnum() or character in " ._()-"
+    )
     cleaned = cleaned.strip(" .")[:200]
     if not cleaned:
         raise AppError(422, "INVALID_FILENAME", "Filename is invalid")
@@ -270,7 +278,12 @@ async def signup(
     email = normalize_email(payload.email)
     if await session.scalar(select(User.id).where(User.email == email)):
         raise AppError(409, "EMAIL_ALREADY_REGISTERED", "An account already exists for this email")
-    user = User(email=email, display_name=payload.display_name.strip(), password_hash=hash_password(payload.password), email_verified=False)
+    user = User(
+        email=email,
+        display_name=payload.display_name.strip(),
+        password_hash=hash_password(payload.password),
+        email_verified=False,
+    )
     session.add(user)
     await session.flush()
     name = payload.organization_name or f"{payload.display_name}'s team"
@@ -283,7 +296,15 @@ async def signup(
     session.add(OrganizationMember(organization_id=organization.id, user_id=user.id, role="owner"))
     await session.flush()
     await bind_database_actor(session, user.id, settings)
-    audit(session, action="USER_SIGNED_UP", resource_type="user", resource_id=user.id, actor_user_id=user.id, organization_id=organization.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="USER_SIGNED_UP",
+        resource_type="user",
+        resource_id=user.id,
+        actor_user_id=user.id,
+        organization_id=organization.id,
+        request_id=request.state.request_id,
+    )
     verification = None
     if services(request).email.enabled:
         verification = await create_one_time_token(session, user, "email_verify", settings)
@@ -335,7 +356,14 @@ async def login(
         raise AppError(403, "EMAIL_NOT_VERIFIED", "Verify your email before signing in")
     await bind_database_actor(session, user.id, settings)
     token = await _token_response(session, user, settings)
-    audit(session, action="USER_LOGGED_IN", resource_type="user", resource_id=user.id, actor_user_id=user.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="USER_LOGGED_IN",
+        resource_type="user",
+        resource_id=user.id,
+        actor_user_id=user.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     if transport == "cookie":
         set_auth_cookies(response, token, settings)
@@ -351,7 +379,9 @@ async def refresh(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
-    raw_refresh = (payload.refresh_token if payload else None) or request.cookies.get("buili_refresh")
+    raw_refresh = (payload.refresh_token if payload else None) or request.cookies.get(
+        "buili_refresh"
+    )
     if not raw_refresh:
         raise AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token is required")
     auth_session = await session.scalar(
@@ -360,26 +390,42 @@ async def refresh(
         .with_for_update()
     )
     if auth_session is not None and auth_session.rotated_at is not None:
-        user = await session.scalar(select(User).where(User.id == auth_session.user_id).with_for_update())
+        user = await session.scalar(
+            select(User).where(User.id == auth_session.user_id).with_for_update()
+        )
         now = utcnow()
         first_detection = auth_session.revocation_reason != "refresh_token_reuse"
         if first_detection:
             await session.execute(
                 update(AuthSession)
-                .where(AuthSession.family_id == auth_session.family_id, AuthSession.revoked_at.is_(None))
+                .where(
+                    AuthSession.family_id == auth_session.family_id,
+                    AuthSession.revoked_at.is_(None),
+                )
                 .values(revoked_at=now, revocation_reason="refresh_token_reuse")
             )
             auth_session.revocation_reason = "refresh_token_reuse"
             if user:
                 user.auth_version += 1
         await session.commit()
-        raise AppError(401, "REFRESH_TOKEN_REUSE_DETECTED", "Refresh token reuse was detected; this session family was revoked")
+        raise AppError(
+            401,
+            "REFRESH_TOKEN_REUSE_DETECTED",
+            "Refresh token reuse was detected; this session family was revoked",
+        )
     expires_at = auth_session.expires_at if auth_session else None
     if expires_at is not None and expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if auth_session is None or auth_session.revoked_at is not None or not expires_at or expires_at <= utcnow():
+    if (
+        auth_session is None
+        or auth_session.revoked_at is not None
+        or not expires_at
+        or expires_at <= utcnow()
+    ):
         raise AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired")
-    user = await session.scalar(select(User).where(User.id == auth_session.user_id).with_for_update())
+    user = await session.scalar(
+        select(User).where(User.id == auth_session.user_id).with_for_update()
+    )
     if user is None or not user.is_active:
         raise AppError(401, "USER_UNAVAILABLE", "User is unavailable")
     if settings.require_email_verification and not user.email_verified:
@@ -408,16 +454,26 @@ async def logout(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    raw_refresh = (payload.refresh_token if payload else None) or request.cookies.get("buili_refresh")
-    auth_session = await session.scalar(
-        select(AuthSession).where(AuthSession.refresh_token_hash == token_hash(raw_refresh)).with_for_update()
-    ) if raw_refresh else None
+    raw_refresh = (payload.refresh_token if payload else None) or request.cookies.get(
+        "buili_refresh"
+    )
+    auth_session = (
+        await session.scalar(
+            select(AuthSession)
+            .where(AuthSession.refresh_token_hash == token_hash(raw_refresh))
+            .with_for_update()
+        )
+        if raw_refresh
+        else None
+    )
     if auth_session and auth_session.revoked_at is None:
         actor_user_id = auth_session.user_id
         await bind_database_actor(session, actor_user_id, settings)
         await session.execute(
             update(AuthSession)
-            .where(AuthSession.family_id == auth_session.family_id, AuthSession.revoked_at.is_(None))
+            .where(
+                AuthSession.family_id == auth_session.family_id, AuthSession.revoked_at.is_(None)
+            )
             .values(revoked_at=utcnow(), revocation_reason="logout")
         )
         audit(
@@ -447,7 +503,14 @@ async def oidc_exchange(
     user = await provision_oidc_user(session, claims, settings, payload.organization_name)
     await bind_database_actor(session, user.id, settings)
     token = await _token_response(session, user, settings)
-    audit(session, action="OIDC_LOGIN", resource_type="user", resource_id=user.id, actor_user_id=user.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="OIDC_LOGIN",
+        resource_type="user",
+        resource_id=user.id,
+        actor_user_id=user.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     if transport == "cookie":
         set_auth_cookies(response, token, settings)
@@ -464,7 +527,9 @@ async def oidc_link(
 ) -> dict:
     claims = await OIDCVerifier(settings).verify(payload.id_token)
     if normalize_email(str(claims.get("email", ""))) != user.email:
-        raise AppError(409, "OIDC_EMAIL_MISMATCH", "Google email must match the signed-in BUILI account")
+        raise AppError(
+            409, "OIDC_EMAIL_MISMATCH", "Google email must match the signed-in BUILI account"
+        )
     existing = await session.scalar(
         select(User.id).where(
             User.oidc_issuer == str(claims.get("iss", settings.oidc_issuer)),
@@ -478,7 +543,14 @@ async def oidc_link(
     user.oidc_subject = str(claims["sub"])
     user.avatar_url = claims.get("picture") or user.avatar_url
     user.email_verified = True
-    audit(session, action="OIDC_IDENTITY_LINKED", resource_type="user", resource_id=user.id, actor_user_id=user.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="OIDC_IDENTITY_LINKED",
+        resource_type="user",
+        resource_id=user.id,
+        actor_user_id=user.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, {"linked": True})
 
@@ -492,6 +564,7 @@ async def me(request: Request, user: User = Depends(current_user)) -> dict:
 async def auth_capabilities(request: Request, settings: Settings = Depends(get_settings)) -> dict:
     output = AuthCapabilitiesOut(
         google_oidc_enabled=bool(settings.oidc_client_id),
+        google_client_id=settings.oidc_client_id,
         password_reset_enabled=services(request).email.enabled,
         email_verification_required=settings.require_email_verification,
         email_delivery="configured" if services(request).email.enabled else "disabled",
@@ -529,10 +602,12 @@ async def reset_password(
     settings: Settings = Depends(get_settings),
 ) -> dict:
     record = await session.scalar(
-        select(OneTimeAuthToken).where(
+        select(OneTimeAuthToken)
+        .where(
             OneTimeAuthToken.token_hash == token_hash(payload.token),
             OneTimeAuthToken.purpose == "password_reset",
-        ).with_for_update()
+        )
+        .with_for_update()
     )
     expires_at = record.expires_at if record else None
     if expires_at is not None and expires_at.tzinfo is None:
@@ -560,7 +635,14 @@ async def reset_password(
         )
         .values(used_at=utcnow())
     )
-    audit(session, action="PASSWORD_RESET", resource_type="user", resource_id=user.id, actor_user_id=user.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="PASSWORD_RESET",
+        resource_type="user",
+        resource_id=user.id,
+        actor_user_id=user.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, {"reset": True})
 
@@ -573,7 +655,9 @@ async def request_email_verification(
     settings: Settings = Depends(get_settings),
 ) -> dict:
     if not services(request).email.enabled:
-        raise AppError(503, "EMAIL_DELIVERY_DISABLED", "Email verification delivery is not configured")
+        raise AppError(
+            503, "EMAIL_DELIVERY_DISABLED", "Email verification delivery is not configured"
+        )
     user = await session.scalar(
         select(User).where(User.email == normalize_email(payload.email)).with_for_update()
     )
@@ -596,19 +680,25 @@ async def verify_email(
     settings: Settings = Depends(get_settings),
 ) -> dict:
     record = await session.scalar(
-        select(OneTimeAuthToken).where(
+        select(OneTimeAuthToken)
+        .where(
             OneTimeAuthToken.token_hash == token_hash(payload.token),
             OneTimeAuthToken.purpose == "email_verify",
-        ).with_for_update()
+        )
+        .with_for_update()
     )
     expires_at = record.expires_at if record else None
     if expires_at is not None and expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if record is None or record.used_at is not None or not expires_at or expires_at <= utcnow():
-        raise AppError(400, "VERIFY_TOKEN_INVALID", "Email verification token is invalid or expired")
+        raise AppError(
+            400, "VERIFY_TOKEN_INVALID", "Email verification token is invalid or expired"
+        )
     user = await session.scalar(select(User).where(User.id == record.user_id).with_for_update())
     if user is None:
-        raise AppError(400, "VERIFY_TOKEN_INVALID", "Email verification token is invalid or expired")
+        raise AppError(
+            400, "VERIFY_TOKEN_INVALID", "Email verification token is invalid or expired"
+        )
     await bind_database_actor(session, user.id, settings)
     user.email_verified = True
     record.used_at = utcnow()
@@ -677,7 +767,15 @@ async def create_organization(
     session.add(organization)
     await session.flush()
     session.add(OrganizationMember(organization_id=organization.id, user_id=user.id, role="owner"))
-    audit(session, action="ORGANIZATION_CREATED", resource_type="organization", resource_id=organization.id, actor_user_id=user.id, organization_id=organization.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="ORGANIZATION_CREATED",
+        resource_type="organization",
+        resource_id=organization.id,
+        actor_user_id=user.id,
+        organization_id=organization.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, OrganizationOut.model_validate(organization))
 
@@ -693,9 +791,13 @@ async def list_projects(
         select(Project)
         .outerjoin(
             OrganizationMember,
-            (OrganizationMember.organization_id == Project.organization_id) & (OrganizationMember.user_id == user.id),
+            (OrganizationMember.organization_id == Project.organization_id)
+            & (OrganizationMember.user_id == user.id),
         )
-        .outerjoin(ProjectMember, (ProjectMember.project_id == Project.id) & (ProjectMember.user_id == user.id))
+        .outerjoin(
+            ProjectMember,
+            (ProjectMember.project_id == Project.id) & (ProjectMember.user_id == user.id),
+        )
         .where(or_(OrganizationMember.id.is_not(None), ProjectMember.id.is_not(None)))
         .distinct()
         .order_by(Project.updated_at.desc())
@@ -714,13 +816,28 @@ async def create_project(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     await ensure_org_access(session, user.id, payload.organization_id, "admin")
-    if await session.scalar(select(Project.id).where(Project.organization_id == payload.organization_id, Project.code == payload.code)):
-        raise AppError(409, "PROJECT_CODE_TAKEN", "Project code already exists in this organization")
+    if await session.scalar(
+        select(Project.id).where(
+            Project.organization_id == payload.organization_id, Project.code == payload.code
+        )
+    ):
+        raise AppError(
+            409, "PROJECT_CODE_TAKEN", "Project code already exists in this organization"
+        )
     project = Project(**payload.model_dump())
     session.add(project)
     await session.flush()
     session.add(ProjectMember(project_id=project.id, user_id=user.id, role="admin"))
-    audit(session, action="PROJECT_CREATED", resource_type="project", resource_id=project.id, actor_user_id=user.id, organization_id=project.organization_id, project_id=project.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="PROJECT_CREATED",
+        resource_type="project",
+        resource_id=project.id,
+        actor_user_id=user.id,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, ProjectOut.model_validate(project))
 
@@ -743,7 +860,16 @@ async def update_project(
 ) -> dict:
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
-    audit(session, action="PROJECT_UPDATED", resource_type="project", resource_id=project.id, actor_user_id=user.id, organization_id=project.organization_id, project_id=project.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="PROJECT_UPDATED",
+        resource_type="project",
+        resource_id=project.id,
+        actor_user_id=user.id,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, ProjectOut.model_validate(project))
 
@@ -765,7 +891,9 @@ async def init_upload(
     else:
         await ensure_org_access(session, user.id, payload.organization_id)
     if settings.storage_backend == "s3" and not payload.sha256:
-        raise AppError(422, "UPLOAD_CHECKSUM_REQUIRED", "SHA-256 is required for direct object storage uploads")
+        raise AppError(
+            422, "UPLOAD_CHECKSUM_REQUIRED", "SHA-256 is required for direct object storage uploads"
+        )
     filename = safe_display_filename(payload.filename)
     upload = Upload(
         organization_id=payload.organization_id,
@@ -783,14 +911,27 @@ async def init_upload(
     if settings.storage_backend == "local":
         upload_url = f"{settings.public_api_url.rstrip('/')}/v1/uploads/{upload.id}/content"
     else:
-        upload_url = await services(request).storage.create_upload_url(upload.object_key, upload.content_type, settings.upload_url_expiry_seconds, upload.sha256)
+        upload_url = await services(request).storage.create_upload_url(
+            upload.object_key,
+            upload.content_type,
+            settings.upload_url_expiry_seconds,
+            upload.sha256,
+        )
     await session.commit()
     output = UploadInitOut(
         upload_id=upload.id,
         upload_url=upload_url,
         headers={
             "Content-Type": upload.content_type,
-            **({"x-amz-checksum-sha256": base64.b64encode(bytes.fromhex(upload.sha256)).decode("ascii")} if settings.storage_backend == "s3" and upload.sha256 else {}),
+            **(
+                {
+                    "x-amz-checksum-sha256": base64.b64encode(bytes.fromhex(upload.sha256)).decode(
+                        "ascii"
+                    )
+                }
+                if settings.storage_backend == "s3" and upload.sha256
+                else {}
+            ),
         },
         expires_in=settings.upload_url_expiry_seconds,
     )
@@ -806,7 +947,9 @@ async def local_upload_content(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     if settings.storage_backend != "local":
-        raise AppError(404, "LOCAL_UPLOAD_DISABLED", "Direct API upload is only available with local storage")
+        raise AppError(
+            404, "LOCAL_UPLOAD_DISABLED", "Direct API upload is only available with local storage"
+        )
     upload = await session.get(Upload, upload_id)
     if upload is None:
         raise AppError(404, "UPLOAD_NOT_FOUND", "Upload was not found")
@@ -822,15 +965,23 @@ async def local_upload_content(
             async for chunk in request.stream():
                 size += len(chunk)
                 if size > upload.expected_size or size > settings.max_upload_bytes:
-                    raise AppError(413, "UPLOAD_TOO_LARGE", "Upload exceeded its declared or configured size")
+                    raise AppError(
+                        413, "UPLOAD_TOO_LARGE", "Upload exceeded its declared or configured size"
+                    )
                 digest.update(chunk)
                 temporary.write(chunk)
         if size != upload.expected_size:
-            raise AppError(409, "UPLOAD_SIZE_MISMATCH", "Uploaded bytes do not match the declared size")
+            raise AppError(
+                409, "UPLOAD_SIZE_MISMATCH", "Uploaded bytes do not match the declared size"
+            )
         computed = digest.hexdigest()
         if upload.sha256 and upload.sha256 != computed:
-            raise AppError(409, "UPLOAD_CHECKSUM_MISMATCH", "Uploaded bytes do not match the declared checksum")
-        info = await services(request).storage.put_file(upload.object_key, Path(temporary_path), upload.content_type)
+            raise AppError(
+                409, "UPLOAD_CHECKSUM_MISMATCH", "Uploaded bytes do not match the declared checksum"
+            )
+        info = await services(request).storage.put_file(
+            upload.object_key, Path(temporary_path), upload.content_type
+        )
         temporary_path = None
     finally:
         if temporary_path:
@@ -872,10 +1023,14 @@ async def complete_upload(
         raise AppError(409, "UPLOAD_STATE_INVALID", "Upload is not ready for completion")
     info = await services(request).storage.stat(upload.object_key)
     if info.size != upload.expected_size:
-        raise AppError(409, "UPLOAD_SIZE_MISMATCH", "Stored object does not match the declared size")
+        raise AppError(
+            409, "UPLOAD_SIZE_MISMATCH", "Stored object does not match the declared size"
+        )
     checksum = info.sha256
     if payload.sha256 and checksum and payload.sha256 != checksum:
-        raise AppError(409, "UPLOAD_CHECKSUM_MISMATCH", "Stored object does not match the completion checksum")
+        raise AppError(
+            409, "UPLOAD_CHECKSUM_MISMATCH", "Stored object does not match the completion checksum"
+        )
     if upload.sha256 and checksum and upload.sha256 != checksum:
         raise AppError(409, "UPLOAD_CHECKSUM_MISMATCH", "Stored object checksum does not match")
     upload.actual_size = info.size
@@ -892,7 +1047,11 @@ async def complete_upload(
             )
         except AppError as exc:
             upload.scan_status = "infected" if exc.code == "MALWARE_DETECTED" else "error"
-            upload.scan_result_json = {"code": exc.code, "message": exc.message, "details": exc.details}
+            upload.scan_result_json = {
+                "code": exc.code,
+                "message": exc.message,
+                "details": exc.details,
+            }
             upload.scanned_at = utcnow()
             upload.status = "rejected" if exc.code == "MALWARE_DETECTED" else "quarantined"
             await session.commit()
@@ -902,9 +1061,24 @@ async def complete_upload(
         upload.scanned_at = utcnow()
         upload.status = "complete" if upload.scan_status == "clean" else "quarantined"
     else:
-        job = Job(organization_id=upload.organization_id, project_id=upload.project_id, kind="upload.scan", input_json={"upload_id": upload.id}, created_by=user.id)
+        job = Job(
+            organization_id=upload.organization_id,
+            project_id=upload.project_id,
+            kind="upload.scan",
+            input_json={"upload_id": upload.id},
+            created_by=user.id,
+        )
         session.add(job)
-    audit(session, action="UPLOAD_COMPLETED", resource_type="upload", resource_id=upload.id, actor_user_id=user.id, organization_id=upload.organization_id, project_id=upload.project_id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="UPLOAD_COMPLETED",
+        resource_type="upload",
+        resource_id=upload.id,
+        actor_user_id=user.id,
+        organization_id=upload.organization_id,
+        project_id=upload.project_id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     if job:
         await services(request).jobs.enqueue(job.id)
@@ -947,7 +1121,16 @@ async def create_document(
     )
     session.add(document)
     await session.flush()
-    audit(session, action="DOCUMENT_CREATED", resource_type="document", resource_id=document.id, actor_user_id=user.id, organization_id=project.organization_id, project_id=project.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="DOCUMENT_CREATED",
+        resource_type="document",
+        resource_id=document.id,
+        actor_user_id=user.id,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(
         request,
@@ -973,9 +1156,14 @@ async def list_documents(
     documents = list(
         (
             await session.scalars(
-                select(Document).where(Document.project_id == project.id).options(selectinload(Document.revisions)).order_by(Document.updated_at.desc())
+                select(Document)
+                .where(Document.project_id == project.id)
+                .options(selectinload(Document.revisions))
+                .order_by(Document.updated_at.desc())
             )
-        ).unique().all()
+        )
+        .unique()
+        .all()
     )
     return envelope(request, [DocumentOut.model_validate(item) for item in documents])
 
@@ -987,7 +1175,9 @@ async def get_document(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    document = await session.scalar(select(Document).where(Document.id == document_id).options(selectinload(Document.revisions)))
+    document = await session.scalar(
+        select(Document).where(Document.id == document_id).options(selectinload(Document.revisions))
+    )
     if document is None:
         raise AppError(404, "DOCUMENT_NOT_FOUND", "Document was not found")
     await project_for_resource(session, document.project_id, user, "document:read")
@@ -1002,12 +1192,19 @@ async def create_revision(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    document = await session.scalar(select(Document).where(Document.id == document_id).with_for_update())
+    document = await session.scalar(
+        select(Document).where(Document.id == document_id).with_for_update()
+    )
     if document is None:
         raise AppError(404, "DOCUMENT_NOT_FOUND", "Document was not found")
     await project_for_resource(session, document.project_id, user, "document:create")
     upload = await session.get(Upload, payload.upload_id)
-    if upload is None or upload.status != "complete" or upload.scan_status != "clean" or upload.project_id != document.project_id:
+    if (
+        upload is None
+        or upload.status != "complete"
+        or upload.scan_status != "clean"
+        or upload.project_id != document.project_id
+    ):
         raise AppError(409, "UPLOAD_NOT_READY", "A completed upload from this project is required")
     if payload.status in {"current", "approved"}:
         superseded_ids = list(
@@ -1022,7 +1219,10 @@ async def create_revision(
         )
         await session.execute(
             update(DocumentRevision)
-            .where(DocumentRevision.document_id == document.id, DocumentRevision.status.in_(["current", "approved"]))
+            .where(
+                DocumentRevision.document_id == document.id,
+                DocumentRevision.status.in_(["current", "approved"]),
+            )
             .values(status="superseded")
         )
         if superseded_ids:
@@ -1065,11 +1265,28 @@ async def create_revision(
             created_by=user.id,
         )
         session.add(job)
-    audit(session, action="DOCUMENT_REVISION_CREATED", resource_type="document_revision", resource_id=revision.id, actor_user_id=user.id, organization_id=document.organization_id, project_id=document.project_id, details={"revision": revision.revision, "status": revision.status}, request_id=request.state.request_id)
+    audit(
+        session,
+        action="DOCUMENT_REVISION_CREATED",
+        resource_type="document_revision",
+        resource_id=revision.id,
+        actor_user_id=user.id,
+        organization_id=document.organization_id,
+        project_id=document.project_id,
+        details={"revision": revision.revision, "status": revision.status},
+        request_id=request.state.request_id,
+    )
     await session.commit()
     if job:
         await services(request).jobs.enqueue(job.id)
-    return envelope(request, {"revision": RevisionCreate.model_validate(payload).model_dump(mode="json"), "revision_id": revision.id, "job_id": job.id if job else None})
+    return envelope(
+        request,
+        {
+            "revision": RevisionCreate.model_validate(payload).model_dump(mode="json"),
+            "revision_id": revision.id,
+            "job_id": job.id if job else None,
+        },
+    )
 
 
 @router.post("/v1/projects/{project_id}/evidence", status_code=201)
@@ -1083,8 +1300,15 @@ async def create_evidence(
     upload = None
     if payload.upload_id:
         upload = await session.get(Upload, payload.upload_id)
-        if upload is None or upload.status != "complete" or upload.scan_status != "clean" or upload.project_id != project.id:
-            raise AppError(409, "UPLOAD_NOT_READY", "A completed upload from this project is required")
+        if (
+            upload is None
+            or upload.status != "complete"
+            or upload.scan_status != "clean"
+            or upload.project_id != project.id
+        ):
+            raise AppError(
+                409, "UPLOAD_NOT_READY", "A completed upload from this project is required"
+            )
     evidence = Evidence(
         organization_id=project.organization_id,
         project_id=project.id,
@@ -1106,11 +1330,26 @@ async def create_evidence(
             created_by=user.id,
         )
         session.add(job)
-    audit(session, action="EVIDENCE_CREATED", resource_type="evidence", resource_id=evidence.id, actor_user_id=user.id, organization_id=project.organization_id, project_id=project.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="EVIDENCE_CREATED",
+        resource_type="evidence",
+        resource_id=evidence.id,
+        actor_user_id=user.id,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     if job:
         await services(request).jobs.enqueue(job.id)
-    return envelope(request, {"evidence": EvidenceOut.model_validate(evidence).model_dump(mode="json"), "job_id": job.id if job else None})
+    return envelope(
+        request,
+        {
+            "evidence": EvidenceOut.model_validate(evidence).model_dump(mode="json"),
+            "job_id": job.id if job else None,
+        },
+    )
 
 
 @router.get("/v1/projects/{project_id}/evidence")
@@ -1120,7 +1359,11 @@ async def list_evidence(
     project: Project = Depends(require_project("evidence:read")),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    statement = select(Evidence).where(Evidence.project_id == project.id).order_by(Evidence.created_at.desc())
+    statement = (
+        select(Evidence)
+        .where(Evidence.project_id == project.id)
+        .order_by(Evidence.created_at.desc())
+    )
     if kind:
         statement = statement.where(Evidence.kind == kind)
     rows = list((await session.scalars(statement)).all())
@@ -1138,7 +1381,13 @@ async def analyze_evidence(
     if evidence is None:
         raise AppError(404, "EVIDENCE_NOT_FOUND", "Evidence was not found")
     await project_for_resource(session, evidence.project_id, user, "evidence:create")
-    job = Job(organization_id=evidence.organization_id, project_id=evidence.project_id, kind="evidence.analyze", input_json={"evidence_id": evidence.id}, created_by=user.id)
+    job = Job(
+        organization_id=evidence.organization_id,
+        project_id=evidence.project_id,
+        kind="evidence.analyze",
+        input_json={"evidence_id": evidence.id},
+        created_by=user.id,
+    )
     session.add(job)
     await session.commit()
     await services(request).jobs.enqueue(job.id)
@@ -1156,7 +1405,10 @@ async def create_issue(
     number = payload.number
     if not number:
         await session.scalar(select(Project.id).where(Project.id == project.id).with_for_update())
-        count = int(await session.scalar(select(func.count(Issue.id)).where(Issue.project_id == project.id)) or 0)
+        count = int(
+            await session.scalar(select(func.count(Issue.id)).where(Issue.project_id == project.id))
+            or 0
+        )
         sequence = count + 1
         number = f"BUI-{sequence:04d}"
         while await session.scalar(
@@ -1164,14 +1416,22 @@ async def create_issue(
         ):
             sequence += 1
             number = f"BUI-{sequence:04d}"
-    if await session.scalar(select(Issue.id).where(Issue.project_id == project.id, Issue.number == number)):
+    if await session.scalar(
+        select(Issue.id).where(Issue.project_id == project.id, Issue.number == number)
+    ):
         raise AppError(409, "ISSUE_NUMBER_TAKEN", "Issue number already exists in this project")
     issue = Issue(
         organization_id=project.organization_id,
         project_id=project.id,
         created_by=user.id,
         **payload.model_dump(
-            exclude={"number", "evidence_ids", "revision_ids", "classification", "recommended_action"}
+            exclude={
+                "number",
+                "evidence_ids",
+                "revision_ids",
+                "classification",
+                "recommended_action",
+            }
         ),
         number=number,
     )
@@ -1180,15 +1440,28 @@ async def create_issue(
     for evidence_id in payload.evidence_ids:
         evidence = await session.get(Evidence, evidence_id)
         if evidence is None or evidence.project_id != project.id:
-            raise AppError(409, "EVIDENCE_SCOPE_MISMATCH", "Linked evidence must belong to this project")
+            raise AppError(
+                409, "EVIDENCE_SCOPE_MISMATCH", "Linked evidence must belong to this project"
+            )
         session.add(IssueEvidence(issue_id=issue.id, evidence_id=evidence.id))
     for revision_id in payload.revision_ids:
         revision = await session.get(DocumentRevision, revision_id)
         document = await session.get(Document, revision.document_id) if revision else None
         if revision is None or document is None or document.project_id != project.id:
-            raise AppError(409, "SOURCE_SCOPE_MISMATCH", "Linked source must belong to this project")
+            raise AppError(
+                409, "SOURCE_SCOPE_MISMATCH", "Linked source must belong to this project"
+            )
         session.add(IssueSource(issue_id=issue.id, revision_id=revision.id))
-    audit(session, action="ISSUE_CREATED", resource_type="issue", resource_id=issue.id, actor_user_id=user.id, organization_id=project.organization_id, project_id=project.id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="ISSUE_CREATED",
+        resource_type="issue",
+        resource_id=issue.id,
+        actor_user_id=user.id,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, IssueOut.model_validate(issue))
 
@@ -1201,7 +1474,9 @@ async def list_issues(
     project: Project = Depends(require_project("issue:read")),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    statement = select(Issue).where(Issue.project_id == project.id).order_by(Issue.updated_at.desc())
+    statement = (
+        select(Issue).where(Issue.project_id == project.id).order_by(Issue.updated_at.desc())
+    )
     if status:
         statement = statement.where(Issue.status == status)
     if classification:
@@ -1224,12 +1499,34 @@ async def get_issue(
     evidence = list(
         (
             await session.scalars(
-                select(Evidence).join(IssueEvidence, IssueEvidence.evidence_id == Evidence.id).where(IssueEvidence.issue_id == issue.id)
+                select(Evidence)
+                .join(IssueEvidence, IssueEvidence.evidence_id == Evidence.id)
+                .where(IssueEvidence.issue_id == issue.id)
             )
         ).all()
     )
-    sources = list((await session.scalars(select(IssueSource).where(IssueSource.issue_id == issue.id))).all())
-    return envelope(request, {"issue": IssueOut.model_validate(issue).model_dump(mode="json"), "evidence": [EvidenceOut.model_validate(item).model_dump(mode="json") for item in evidence], "sources": [{"id": item.id, "revision_id": item.revision_id, "page": item.page, "quote": item.quote, "relationship_type": item.relationship_type} for item in sources]})
+    sources = list(
+        (await session.scalars(select(IssueSource).where(IssueSource.issue_id == issue.id))).all()
+    )
+    return envelope(
+        request,
+        {
+            "issue": IssueOut.model_validate(issue).model_dump(mode="json"),
+            "evidence": [
+                EvidenceOut.model_validate(item).model_dump(mode="json") for item in evidence
+            ],
+            "sources": [
+                {
+                    "id": item.id,
+                    "revision_id": item.revision_id,
+                    "page": item.page,
+                    "quote": item.quote,
+                    "relationship_type": item.relationship_type,
+                }
+                for item in sources
+            ],
+        },
+    )
 
 
 @router.patch("/v1/issues/{issue_id}")
@@ -1245,7 +1542,13 @@ async def update_issue(
         raise AppError(404, "ISSUE_NOT_FOUND", "Issue was not found")
     project = await project_for_resource(session, issue.project_id, user, "issue:update")
     changes = payload.model_dump(exclude_unset=True)
-    protected = {"status", "classification", "recommended_action", "evidence_sufficiency", "missing_evidence"}
+    protected = {
+        "status",
+        "classification",
+        "recommended_action",
+        "evidence_sufficiency",
+        "missing_evidence",
+    }
     if protected & changes.keys():
         raise AppError(
             422,
@@ -1261,14 +1564,26 @@ async def update_issue(
         try:
             await ensure_project_permission(session, assignee.id, project, "project:read")
         except AppError as exc:
-            raise AppError(422, "ASSIGNEE_INVALID", "Assignee must be an active project member") from exc
+            raise AppError(
+                422, "ASSIGNEE_INVALID", "Assignee must be an active project member"
+            ) from exc
     for field, value in changes.items():
         setattr(issue, field, value)
     issue.status = "draft"
     issue.verification_json = {}
     issue.approved_by = None
     issue.approved_at = None
-    audit(session, action="ISSUE_UPDATED", resource_type="issue", resource_id=issue.id, actor_user_id=user.id, organization_id=issue.organization_id, project_id=issue.project_id, details=payload.model_dump(exclude_unset=True), request_id=request.state.request_id)
+    audit(
+        session,
+        action="ISSUE_UPDATED",
+        resource_type="issue",
+        resource_id=issue.id,
+        actor_user_id=user.id,
+        organization_id=issue.organization_id,
+        project_id=issue.project_id,
+        details=payload.model_dump(exclude_unset=True),
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, IssueOut.model_validate(issue))
 
@@ -1290,7 +1605,9 @@ async def link_issue_evidence(
         raise AppError(409, "EVIDENCE_SCOPE_MISMATCH", "Evidence belongs to a different project")
     link = await session.get(IssueEvidence, (issue.id, evidence.id))
     if link is None:
-        link = IssueEvidence(issue_id=issue.id, evidence_id=evidence.id, relationship_type=payload.relationship_type)
+        link = IssueEvidence(
+            issue_id=issue.id, evidence_id=evidence.id, relationship_type=payload.relationship_type
+        )
         session.add(link)
     else:
         link.relationship_type = payload.relationship_type
@@ -1334,7 +1651,9 @@ async def link_issue_source(
         select(IssueSource).where(
             IssueSource.issue_id == issue.id,
             IssueSource.revision_id == revision.id,
-            IssueSource.page.is_(None) if payload.page is None else IssueSource.page == payload.page,
+            IssueSource.page.is_(None)
+            if payload.page is None
+            else IssueSource.page == payload.page,
         )
     )
     if existing:
@@ -1378,7 +1697,13 @@ async def analyze_issue_route(
     if issue is None:
         raise AppError(404, "ISSUE_NOT_FOUND", "Issue was not found")
     await project_for_resource(session, issue.project_id, user, "issue:update")
-    job = Job(organization_id=issue.organization_id, project_id=issue.project_id, kind="issue.analyze", input_json={"issue_id": issue.id}, created_by=user.id)
+    job = Job(
+        organization_id=issue.organization_id,
+        project_id=issue.project_id,
+        kind="issue.analyze",
+        input_json={"issue_id": issue.id},
+        created_by=user.id,
+    )
     session.add(job)
     await session.commit()
     await services(request).jobs.enqueue(job.id)
@@ -1408,7 +1733,16 @@ async def approve_issue(
     issue.status = "approved"
     issue.approved_by = user.id
     issue.approved_at = utcnow()
-    audit(session, action="ISSUE_APPROVED", resource_type="issue", resource_id=issue.id, actor_user_id=user.id, organization_id=issue.organization_id, project_id=issue.project_id, request_id=request.state.request_id)
+    audit(
+        session,
+        action="ISSUE_APPROVED",
+        resource_type="issue",
+        resource_id=issue.id,
+        actor_user_id=user.id,
+        organization_id=issue.organization_id,
+        project_id=issue.project_id,
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, IssueOut.model_validate(issue))
 
@@ -1435,7 +1769,17 @@ async def create_report(
         user_id=user.id,
         approve=payload.approve,
     )
-    audit(session, action="REPORT_GENERATED", resource_type="report", resource_id=report.id, actor_user_id=user.id, organization_id=report.organization_id, project_id=report.project_id, details={"kind": report.kind, "version": report.version}, request_id=request.state.request_id)
+    audit(
+        session,
+        action="REPORT_GENERATED",
+        resource_type="report",
+        resource_id=report.id,
+        actor_user_id=user.id,
+        organization_id=report.organization_id,
+        project_id=report.project_id,
+        details={"kind": report.kind, "version": report.version},
+        request_id=request.state.request_id,
+    )
     await session.commit()
     return envelope(request, ReportOut.model_validate(report))
 
@@ -1544,7 +1888,11 @@ async def project_audit(
     project: Project = Depends(require_project("audit:read")),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    statement = select(AuditLog).where(AuditLog.project_id == project.id).order_by(AuditLog.created_at.desc())
+    statement = (
+        select(AuditLog)
+        .where(AuditLog.project_id == project.id)
+        .order_by(AuditLog.created_at.desc())
+    )
     count_statement = select(func.count(AuditLog.id)).where(AuditLog.project_id == project.id)
     if action:
         statement = statement.where(AuditLog.action == action)
@@ -1575,7 +1923,15 @@ async def search_project(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     external_allowed = bool(project.metadata_json.get("external_ai_allowed", False))
-    hits, mode = await services(request).search.search(session, project_id=project.id, organization_id=project.organization_id, query=payload.query, limit=payload.limit, source_types=payload.source_types, external_ai_allowed=external_allowed)
+    hits, mode = await services(request).search.search(
+        session,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        query=payload.query,
+        limit=payload.limit,
+        source_types=payload.source_types,
+        external_ai_allowed=external_allowed,
+    )
     return envelope(request, SearchOut(query=payload.query, hits=hits, mode=mode))
 
 
@@ -1587,13 +1943,35 @@ async def ask_project(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     external_allowed = bool(project.metadata_json.get("external_ai_allowed", False))
-    hits, _ = await services(request).search.search(session, project_id=project.id, organization_id=project.organization_id, query=payload.query, limit=payload.limit, source_types=payload.source_types, external_ai_allowed=external_allowed)
-    answer, cited, provider = await services(request).ai.grounded_answer(payload.query, [item.content for item in hits], external_allowed=external_allowed)
+    hits, _ = await services(request).search.search(
+        session,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        query=payload.query,
+        limit=payload.limit,
+        source_types=payload.source_types,
+        external_ai_allowed=external_allowed,
+    )
+    answer, cited, provider = await services(request).ai.grounded_answer(
+        payload.query, [item.content for item in hits], external_allowed=external_allowed
+    )
     citations = [
-        Citation(index=index, source_type=hits[index - 1].source_type, source_id=hits[index - 1].source_id, chunk_id=hits[index - 1].chunk_id, excerpt=hits[index - 1].content[:300], page=hits[index - 1].page)
+        Citation(
+            index=index,
+            source_type=hits[index - 1].source_type,
+            source_id=hits[index - 1].source_id,
+            chunk_id=hits[index - 1].chunk_id,
+            excerpt=hits[index - 1].content[:300],
+            page=hits[index - 1].page,
+        )
         for index in cited
     ]
-    output = AskOut(answer=answer, citations=citations, provider=provider, model=services(request).ai.settings.openai_model if provider == "openai" else None)
+    output = AskOut(
+        answer=answer,
+        citations=citations,
+        provider=provider,
+        model=services(request).ai.settings.openai_model if provider == "openai" else None,
+    )
     return envelope(request, output)
 
 
@@ -1625,7 +2003,9 @@ async def generate_spatial_scene(
     revision = await session.get(DocumentRevision, payload.source_revision_id)
     document = await session.get(Document, revision.document_id) if revision else None
     if revision is None or document is None or document.project_id != project.id:
-        raise AppError(409, "SOURCE_SCOPE_MISMATCH", "Spatial source revision must belong to this project")
+        raise AppError(
+            409, "SOURCE_SCOPE_MISMATCH", "Spatial source revision must belong to this project"
+        )
     job = Job(
         organization_id=project.organization_id,
         project_id=project.id,
@@ -1645,7 +2025,15 @@ async def list_spatial_scenes(
     project: Project = Depends(require_project("project:read")),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    rows = list((await session.scalars(select(SpatialScene).where(SpatialScene.project_id == project.id).order_by(SpatialScene.created_at.desc()))).all())
+    rows = list(
+        (
+            await session.scalars(
+                select(SpatialScene)
+                .where(SpatialScene.project_id == project.id)
+                .order_by(SpatialScene.created_at.desc())
+            )
+        ).all()
+    )
     return envelope(request, [SpatialSceneOut.model_validate(item) for item in rows])
 
 
@@ -1665,6 +2053,195 @@ async def list_plan_graphs(
         ).all()
     )
     return envelope(request, [PlanGraphOut.model_validate(item) for item in rows])
+
+
+@router.post("/v1/projects/{project_id}/fixture-assets/generate", status_code=202)
+async def generate_fixture_asset(
+    payload: FixtureAssetGenerateIn,
+    request: Request,
+    project: Project = Depends(require_project("spatial:create")),
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if not services(request).fixture_assets.enabled:
+        raise AppError(
+            503,
+            "TRIPO_NOT_CONFIGURED",
+            "Fixture generation is not configured on the production worker",
+        )
+    if not bool(project.metadata_json.get("external_asset_generation_allowed", False)):
+        raise AppError(
+            409,
+            "EXTERNAL_ASSET_GENERATION_NOT_APPROVED",
+            "Project approval is required before sending a prompt to an external 3D provider",
+        )
+    version = (
+        int(
+            await session.scalar(
+                select(func.max(FixtureAsset.version)).where(
+                    FixtureAsset.project_id == project.id,
+                    FixtureAsset.semantic_type == payload.semantic_type,
+                )
+            )
+            or 0
+        )
+        + 1
+    )
+    asset = FixtureAsset(
+        organization_id=project.organization_id,
+        project_id=project.id,
+        semantic_type=payload.semantic_type,
+        version=version,
+        provider="tripo",
+        model_version=services(request).fixture_assets.settings.tripo_model_version,
+        status="queued",
+        prompt=payload.prompt,
+        negative_prompt=payload.negative_prompt,
+        transform_json=payload.transform_json,
+        provider_json={"face_limit": payload.face_limit},
+        created_by=user.id,
+    )
+    session.add(asset)
+    await session.flush()
+    job = Job(
+        organization_id=project.organization_id,
+        project_id=project.id,
+        kind="fixture_asset.generate",
+        input_json={"fixture_asset_id": asset.id},
+        created_by=user.id,
+    )
+    session.add(job)
+    audit(
+        session,
+        action="FIXTURE_ASSET_GENERATION_QUEUED",
+        resource_type="fixture_asset",
+        resource_id=asset.id,
+        actor_user_id=user.id,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        details={"semantic_type": asset.semantic_type, "provider": asset.provider},
+        request_id=request.state.request_id,
+    )
+    await session.commit()
+    await services(request).jobs.enqueue(job.id)
+    return envelope(
+        request,
+        {
+            "asset": FixtureAssetOut.model_validate(asset).model_dump(mode="json"),
+            "job": JobOut.model_validate(job).model_dump(mode="json"),
+        },
+    )
+
+
+@router.get("/v1/projects/{project_id}/fixture-assets")
+async def list_fixture_assets(
+    request: Request,
+    project: Project = Depends(require_project("project:read")),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    rows = list(
+        (
+            await session.scalars(
+                select(FixtureAsset)
+                .where(FixtureAsset.project_id == project.id)
+                .order_by(FixtureAsset.semantic_type, FixtureAsset.version.desc())
+            )
+        ).all()
+    )
+    return envelope(request, [FixtureAssetOut.model_validate(item) for item in rows])
+
+
+@router.get("/v1/projects/{project_id}/fixture-assets/manifest")
+async def fixture_asset_manifest(
+    request: Request,
+    project: Project = Depends(require_project("project:read")),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    assets = list(
+        (
+            await session.scalars(
+                select(FixtureAsset).where(
+                    FixtureAsset.project_id == project.id,
+                    FixtureAsset.status == "approved",
+                )
+            )
+        ).all()
+    )
+    manifest = []
+    for asset in assets:
+        if not asset.glb_storage_key:
+            continue
+        manifest.append(
+            {
+                "id": asset.id,
+                "semantic_type": asset.semantic_type,
+                "version": asset.version,
+                "uri": await services(request).storage.create_download_url(
+                    asset.glb_storage_key, 300
+                ),
+                "sha256": asset.sha256,
+                "transform": asset.transform_json,
+                "bounds": asset.bounds_json,
+                "provider": asset.provider,
+                "model_version": asset.model_version,
+            }
+        )
+    return envelope(request, manifest)
+
+
+@router.post("/v1/fixture-assets/{asset_id}/approve")
+async def approve_fixture_asset(
+    asset_id: str,
+    payload: FixtureAssetReviewIn,
+    request: Request,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    asset = await session.scalar(
+        select(FixtureAsset).where(FixtureAsset.id == asset_id).with_for_update()
+    )
+    if asset is None:
+        raise AppError(404, "FIXTURE_ASSET_NOT_FOUND", "Fixture asset was not found")
+    await project_for_resource(session, asset.project_id, user, "spatial:create")
+    if asset.status != "review_required" or not asset.glb_storage_key or not asset.sha256:
+        raise AppError(
+            409,
+            "FIXTURE_ASSET_NOT_REVIEWABLE",
+            "Only a fully copied and validated asset can be approved",
+        )
+    if not (payload.scale_verified and payload.orientation_verified and payload.license_verified):
+        raise AppError(
+            422,
+            "FIXTURE_ASSET_ATTESTATION_INCOMPLETE",
+            "Scale, orientation, and provider-license checks are all required",
+        )
+    await session.execute(
+        update(FixtureAsset)
+        .where(
+            FixtureAsset.project_id == asset.project_id,
+            FixtureAsset.semantic_type == asset.semantic_type,
+            FixtureAsset.status == "approved",
+            FixtureAsset.id != asset.id,
+        )
+        .values(status="superseded")
+    )
+    asset.status = "approved"
+    asset.approved_by = user.id
+    asset.approved_at = utcnow()
+    asset.review_json = payload.model_dump(mode="json")
+    audit(
+        session,
+        action="FIXTURE_ASSET_APPROVED",
+        resource_type="fixture_asset",
+        resource_id=asset.id,
+        actor_user_id=user.id,
+        organization_id=asset.organization_id,
+        project_id=asset.project_id,
+        details={"semantic_type": asset.semantic_type, "sha256": asset.sha256},
+        request_id=request.state.request_id,
+    )
+    await session.commit()
+    return envelope(request, FixtureAssetOut.model_validate(asset))
 
 
 @router.post("/v1/spatial-scenes/{scene_id}/approve")
@@ -1692,7 +2269,12 @@ async def approve_spatial_scene(
         raise AppError(409, "PLAN_GRAPH_MISSING", "Spatial scene plan graph is missing")
     reasons = official_use_gate(graph, scene)
     if reasons:
-        raise AppError(409, "SPATIAL_REVIEW_BLOCKED", "Spatial output cannot be approved for official use", {"reasons": reasons})
+        raise AppError(
+            409,
+            "SPATIAL_REVIEW_BLOCKED",
+            "Spatial output cannot be approved for official use",
+            {"reasons": reasons},
+        )
     await session.execute(
         update(SpatialScene)
         .where(
@@ -1763,25 +2345,36 @@ async def attest_spatial_scene(
     }
     unknown = sorted(set(payload.locked_object_ids) - known_ids)
     if unknown:
-        raise AppError(422, "UNKNOWN_SPATIAL_OBJECT", "Cannot lock unknown spatial objects", {"object_ids": unknown})
-    graph_version = int(
-        await session.scalar(
-            select(func.max(PlanGraph.version)).where(
-                PlanGraph.project_id == source_graph.project_id,
-                PlanGraph.source_revision_id == source_graph.source_revision_id,
-            )
+        raise AppError(
+            422,
+            "UNKNOWN_SPATIAL_OBJECT",
+            "Cannot lock unknown spatial objects",
+            {"object_ids": unknown},
         )
-        or 0
-    ) + 1
-    scene_version = int(
-        await session.scalar(
-            select(func.max(SpatialScene.version)).where(
-                SpatialScene.project_id == source_scene.project_id,
-                SpatialScene.source_revision_id == source_scene.source_revision_id,
+    graph_version = (
+        int(
+            await session.scalar(
+                select(func.max(PlanGraph.version)).where(
+                    PlanGraph.project_id == source_graph.project_id,
+                    PlanGraph.source_revision_id == source_graph.source_revision_id,
+                )
             )
+            or 0
         )
-        or 0
-    ) + 1
+        + 1
+    )
+    scene_version = (
+        int(
+            await session.scalar(
+                select(func.max(SpatialScene.version)).where(
+                    SpatialScene.project_id == source_scene.project_id,
+                    SpatialScene.source_revision_id == source_scene.source_revision_id,
+                )
+            )
+            or 0
+        )
+        + 1
+    )
     graph = PlanGraph(
         organization_id=source_graph.organization_id,
         project_id=source_graph.project_id,
@@ -1824,7 +2417,12 @@ async def attest_spatial_scene(
     await session.flush()
     reasons = official_use_gate(graph, scene)
     if reasons:
-        raise AppError(409, "SPATIAL_REVIEW_BLOCKED", "Blocking parser errors cannot be overridden by attestation", {"reasons": reasons})
+        raise AppError(
+            409,
+            "SPATIAL_REVIEW_BLOCKED",
+            "Blocking parser errors cannot be overridden by attestation",
+            {"reasons": reasons},
+        )
     await session.execute(
         update(SpatialScene)
         .where(
@@ -1863,7 +2461,10 @@ async def attest_spatial_scene(
     await session.commit()
     return envelope(
         request,
-        {"scene": SpatialSceneOut.model_validate(scene).model_dump(mode="json"), "plan_graph": PlanGraphOut.model_validate(graph).model_dump(mode="json")},
+        {
+            "scene": SpatialSceneOut.model_validate(scene).model_dump(mode="json"),
+            "plan_graph": PlanGraphOut.model_validate(graph).model_dump(mode="json"),
+        },
     )
 
 
@@ -1875,18 +2476,22 @@ async def download_file(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    project_id = await session.scalar(select(Evidence.project_id).where(Evidence.storage_key == object_key))
-    if not project_id:
-        project_id = await session.scalar(select(Report.project_id).where(Report.storage_key == object_key))
+    project_id = await session.scalar(
+        select(Evidence.project_id).where(Evidence.storage_key == object_key)
+    )
     if not project_id:
         project_id = await session.scalar(
-            select(ReportArtifact.project_id).where(
-                ReportArtifact.storage_key == object_key
-            )
+            select(Report.project_id).where(Report.storage_key == object_key)
+        )
+    if not project_id:
+        project_id = await session.scalar(
+            select(ReportArtifact.project_id).where(ReportArtifact.storage_key == object_key)
         )
     if not project_id:
         document = await session.scalar(
-            select(Document).join(DocumentRevision).where(DocumentRevision.storage_key == object_key)
+            select(Document)
+            .join(DocumentRevision)
+            .where(DocumentRevision.storage_key == object_key)
         )
         project_id = document.project_id if document else None
     if not project_id:
@@ -1900,10 +2505,16 @@ async def download_file(
             )
         )
     if not project_id:
+        project_id = await session.scalar(
+            select(FixtureAsset.project_id).where(FixtureAsset.glb_storage_key == object_key)
+        )
+    if not project_id:
         raise AppError(404, "FILE_NOT_FOUND", "File was not found")
     await project_for_resource(session, project_id, user, "project:read")
     if settings.storage_backend == "s3":
-        return RedirectResponse(await services(request).storage.create_download_url(object_key, 300), status_code=307)
+        return RedirectResponse(
+            await services(request).storage.create_download_url(object_key, 300), status_code=307
+        )
     data = await services(request).storage.read_bytes(object_key)
     content_type = "application/octet-stream"
     evidence = await session.scalar(select(Evidence).where(Evidence.storage_key == object_key))

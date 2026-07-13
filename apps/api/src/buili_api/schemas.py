@@ -124,6 +124,7 @@ class VerifyEmailIn(BaseModel):
 
 class AuthCapabilitiesOut(BaseModel):
     google_oidc_enabled: bool
+    google_client_id: str | None = None
     password_reset_enabled: bool
     email_verification_required: bool
     email_delivery: str
@@ -240,8 +241,18 @@ class UploadOut(ORMModel):
 class DocumentCreate(BaseModel):
     title: str = Field(min_length=1, max_length=512)
     kind: Literal[
-        "drawing", "specification", "rfi", "rfi_response", "submittal", "shop_drawing",
-        "change_order", "change_directive", "field_report", "daily_report", "meeting_minutes", "other"
+        "drawing",
+        "specification",
+        "rfi",
+        "rfi_response",
+        "submittal",
+        "shop_drawing",
+        "change_order",
+        "change_directive",
+        "field_report",
+        "daily_report",
+        "meeting_minutes",
+        "other",
     ] = "other"
     discipline: str = "general"
 
@@ -255,7 +266,9 @@ class RevisionCreate(BaseModel):
     upload_id: str
     revision: str = Field(min_length=1, max_length=80)
     issue_date: datetime | None = None
-    status: Literal["uploaded", "review_required", "current", "approved", "superseded", "void"] = "current"
+    status: Literal["uploaded", "review_required", "current", "approved", "superseded", "void"] = (
+        "current"
+    )
     sheet_number: str | None = None
     metadata_json: dict[str, Any] = Field(default_factory=dict)
     process: bool = True
@@ -437,7 +450,9 @@ class JobOut(ORMModel):
 
 
 class ReportCreate(BaseModel):
-    kind: Literal["rfi", "punch", "change_event", "evidence_package", "model_update_request"] = "rfi"
+    kind: Literal["rfi", "punch", "change_event", "evidence_package", "model_update_request"] = (
+        "rfi"
+    )
     title: str | None = None
     approve: bool = False
 
@@ -562,3 +577,80 @@ class SpatialReviewIn(BaseModel):
     scale_verified: bool
     geometry_verified: bool
     locked_object_ids: list[str] = Field(default_factory=list, max_length=5000)
+
+
+class FixtureAssetGenerateIn(BaseModel):
+    semantic_type: str = Field(pattern=r"^[a-z][a-z0-9_]{1,79}$")
+    prompt: str = Field(min_length=10, max_length=1024)
+    negative_prompt: str = Field(default="", max_length=255)
+    face_limit: int = Field(default=6000, ge=48, le=20_000)
+    transform_json: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "scale": [1.0, 1.0, 1.0],
+            "rotation_euler": [0.0, 0.0, 0.0],
+            "origin": "semantic_fixture_center",
+        }
+    )
+
+    @field_validator("prompt", "negative_prompt")
+    @classmethod
+    def normalize_prompts(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("transform_json")
+    @classmethod
+    def validate_transform(cls, value: dict[str, Any]) -> dict[str, Any]:
+        scale = value.get("scale", [1.0, 1.0, 1.0])
+        rotation = value.get("rotation_euler", [0.0, 0.0, 0.0])
+        if not (
+            isinstance(scale, list)
+            and len(scale) == 3
+            and all(isinstance(item, (int, float)) and 0.001 <= item <= 100 for item in scale)
+        ):
+            raise ValueError("transform scale must contain three values between 0.001 and 100")
+        if not (
+            isinstance(rotation, list)
+            and len(rotation) == 3
+            and all(isinstance(item, (int, float)) and -6.284 <= item <= 6.284 for item in rotation)
+        ):
+            raise ValueError("rotation_euler must contain three radian values")
+        return {
+            "scale": [float(item) for item in scale],
+            "rotation_euler": [float(item) for item in rotation],
+            "origin": str(value.get("origin", "semantic_fixture_center"))[:80],
+        }
+
+
+class FixtureAssetReviewIn(BaseModel):
+    attestation: str = Field(min_length=20, max_length=4000)
+    scale_verified: bool
+    orientation_verified: bool
+    license_verified: bool
+
+
+class FixtureAssetOut(ORMModel):
+    id: str
+    organization_id: str
+    project_id: str
+    semantic_type: str
+    version: int
+    provider: str
+    provider_task_id: str | None
+    model_version: str
+    status: str
+    prompt: str
+    negative_prompt: str
+    glb_storage_key: str | None
+    preview_url: str | None
+    sha256: str | None
+    byte_size: int | None
+    face_count: int | None
+    bounds_json: dict[str, Any]
+    transform_json: dict[str, Any]
+    provider_json: dict[str, Any]
+    review_json: dict[str, Any]
+    created_by: str
+    approved_by: str | None
+    approved_at: datetime | None
+    created_at: datetime
+    updated_at: datetime

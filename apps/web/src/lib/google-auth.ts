@@ -18,7 +18,9 @@ function loadGoogleIdentity() {
 }
 
 export async function signInWithGoogle(organizationName?:string) {
-  const clientId=process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const configured = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const capabilities = configured ? null : await authApi.capabilities();
+  const clientId = configured || capabilities?.google_client_id;
   if (!clientId) throw new Error('Google sign-in is not configured for this environment.');
   await loadGoogleIdentity();
   return new Promise<void>((resolve,reject) => {

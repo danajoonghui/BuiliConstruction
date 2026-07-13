@@ -92,6 +92,7 @@ JWT_SECRET     at least 32 cryptographically random bytes
 OIDC_CLIENT_ID Google Web client ID
 ORIGIN_VERIFY_SECRET at least 32 random bytes, shared only with Cloudflare
 OPENAI_API_KEY only when external_ai_enabled=true
+TRIPO_API_KEY only when tripo_enabled=true
 ```
 
 Create the three roles with `apps/api/scripts/bootstrap_database_roles.sql`,
@@ -105,8 +106,9 @@ run any runtime with the RDS master account. Never put secret values in a
 `.tfvars`, backend file, shell history, ticket, chat, screenshot, or commit.
 Revoke any key that has appeared in one of those locations before deployment.
 
-The Google OAuth application must list the exact production origins/redirects,
-and its public client ID must also be supplied to the frontend deployment. No
+The Google OAuth application must list the exact production origins described
+in `docs/GOOGLE_SIGN_IN.md`. The frontend reads its public client ID from
+`GET /v1/auth/capabilities`, so no frontend secret or rebuild is required. No
 Google client secret is used by this ID-token exchange flow. Test account
 creation, explicit identity linking, revocation, and logout before release.
 
@@ -169,7 +171,43 @@ External AI is disabled by default. Enabling it requires both:
 
 - `external_ai_enabled=true` in the reviewed release configuration; and
 - a new project-scoped `OPENAI_API_KEY` in Secrets Manager with budgets and
-  alerts.
+alerts.
+
+Tripo presentation-asset generation has a separate `tripo_enabled` kill switch
+and `TRIPO_API_KEY`. The worker submits only approved semantic prompts, validates
+provider URLs and GLB bytes, copies accepted files to BUILI storage, and leaves
+them `review_required`. Provider URLs are never sent to the browser and generated
+objects cannot change PlanGraph coordinates or contractual dimensions.
+
+## 5.1 Repeatable GitHub production deployment
+
+After the initial AWS bootstrap, `.github/workflows/deploy-production-api.yml`
+performs the normal release with GitHub OIDC instead of long-lived AWS keys. Set
+the GitHub `production` environment to require manual approval and configure:
+
+```text
+Secret:   AWS_DEPLOY_ROLE_ARN
+Variable: AWS_REGION                 us-west-1
+Variable: TF_STATE_BUCKET            private encrypted state bucket
+Variable: TF_STATE_KEY               buili/production/terraform.tfstate
+Variable: ACM_CERTIFICATE_ARN        issued certificate for api.builiconstruction.com
+Variable: ALARM_EMAIL                optional
+Variable: EXTERNAL_AI_ENABLED        false until approved
+Variable: OPENAI_MODEL               pinned only when enabled
+Variable: TRIPO_ENABLED              false until project policy and key are ready
+Variable: TRIPO_MODEL_VERSION        P1-20260311
+```
+
+The workflow builds an immutable image tagged with the Git commit SHA, pushes it
+to ECR, registers but does not yet promote the migration task, requires the
+one-shot migration exit code to be zero, applies the reviewed infrastructure
+plan, then verifies readiness through Cloudflare. A failed migration therefore
+cannot update the long-lived API/worker services.
+
+The first bootstrap remains a deliberate administrator operation because the
+RDS roles, initial Secrets Manager JSON value, ACM validation, Cloudflare origin
+rule, and GitHub OIDC trust must exist before an unattended deployment can be
+safe. Never solve that dependency by committing a database password or AWS key.
 
 The worker receives no key while the switch is off. Keep per-organization and
 per-project consent/policy checks in the application, treat uploaded content as

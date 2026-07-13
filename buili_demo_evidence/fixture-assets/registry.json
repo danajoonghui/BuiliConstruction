@@ -1,0 +1,95 @@
+{
+  "schema": "buili.fixture-asset-registry.v1",
+  "assets": {
+    "ceiling_light": {
+      "uri": "/demo/fixture-assets/ceiling_light.0fb79e1e3f2b.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 17060,
+      "sha256": "0fb79e1e3f2badc32687cf08b6bba655737416978263d54f303d305f9465bb6b",
+      "vertices": 400,
+      "triangles": 792
+    },
+    "ceiling_diffuser": {
+      "uri": "/demo/fixture-assets/ceiling_diffuser.ecc271577256.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 5112,
+      "sha256": "ecc27157725660af5e8256b73bfa1736a167873cf997f2c0a2844ad7e5b8046a",
+      "vertices": 96,
+      "triangles": 144
+    },
+    "ceiling_return": {
+      "uri": "/demo/fixture-assets/ceiling_return.4e4b22be5d49.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 4112,
+      "sha256": "4e4b22be5d49ca6de0ef21aca0595c1c3588582e3573d44cb5e64a82afd2b2f9",
+      "vertices": 64,
+      "triangles": 96
+    },
+    "electrical_panel": {
+      "uri": "/demo/fixture-assets/electrical_panel.8d73837ee48b.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 6348,
+      "sha256": "8d73837ee48be30b489385f1ddc2fda182e8b305699a22c7a2dd20388319c624",
+      "vertices": 120,
+      "triangles": 180
+    },
+    "receptacle": {
+      "uri": "/demo/fixture-assets/receptacle.d7224d23b200.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 4816,
+      "sha256": "d7224d23b2003f0991f1b5716748c349be7968ab13a87da0478c21c1c1797037",
+      "vertices": 76,
+      "triangles": 140
+    },
+    "mechanical_equipment": {
+      "uri": "/demo/fixture-assets/mechanical_equipment.0eb94dd8543d.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 6128,
+      "sha256": "0eb94dd8543d21803829e9b1429db572edd3a5193c8f92119d6f522917ba405d",
+      "vertices": 106,
+      "triangles": 180
+    },
+    "casework": {
+      "uri": "/demo/fixture-assets/casework.2ae1bc697b34.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 6056,
+      "sha256": "2ae1bc697b34dc1de31027adf7948a5e3625f452844cf8c9db0efe0916bcf521",
+      "vertices": 118,
+      "triangles": 204
+    },
+    "sink": {
+      "uri": "/demo/fixture-assets/sink.90e1e6aea5ee.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 15316,
+      "sha256": "90e1e6aea5ee2ce4ada2859d9af02656f3adcc1df34d1a08e897f5351a5a0586",
+      "vertices": 368,
+      "triangles": 724
+    },
+    "vanity": {
+      "uri": "/demo/fixture-assets/vanity.563671aa99c9.glb",
+      "status": "approved_demo_seed",
+      "provider": "buili_deterministic_seed",
+      "license": "BUILI-owned generated demo asset",
+      "bytes": 14912,
+      "sha256": "563671aa99c9fc8bb08534c4dad11a52b020859c4910dd9a834567f263a4ba7d",
+      "vertices": 342,
+      "triangles": 672
+    }
+  }
+}

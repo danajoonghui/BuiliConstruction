@@ -118,11 +118,15 @@ MECHANICAL_FIXTURES = [
 ]
 
 
-def _xy(x: float, y: float, plan_x: float, plan_y: float, scale: float) -> tuple[float, float]:
+def _xy(
+    x: float, y: float, plan_x: float, plan_y: float, scale: float
+) -> tuple[float, float]:
     return plan_x + x * scale, plan_y + y * scale
 
 
-def _draw_dimensions(c: canvas.Canvas, plan_x: float, plan_y: float, scale: float) -> None:
+def _draw_dimensions(
+    c: canvas.Canvas, plan_x: float, plan_y: float, scale: float
+) -> None:
     c.saveState()
     c.setStrokeColor(MUTED)
     c.setFillColor(MUTED)
@@ -139,7 +143,7 @@ def _draw_dimensions(c: canvas.Canvas, plan_x: float, plan_y: float, scale: floa
         c.line(x0, y, x1, y)
         c.line(x0, y - 2, x0 + 4, y + 2)
         c.line(x1 - 4, y - 2, x1, y + 2)
-        c.drawCentredString((x0 + x1) / 2, y + 3, f"{end-start:.2f} m")
+        c.drawCentredString((x0 + x1) / 2, y + 3, f"{end - start:.2f} m")
     x = plan_x - 18
     y_values = [0.0, 2.4, 5.8, 7.2, 10.0]
     for value in y_values:
@@ -154,7 +158,7 @@ def _draw_dimensions(c: canvas.Canvas, plan_x: float, plan_y: float, scale: floa
         c.saveState()
         c.translate(x - 4, (y0 + y1) / 2)
         c.rotate(90)
-        c.drawCentredString(0, 1, f"{end-start:.2f} m")
+        c.drawCentredString(0, 1, f"{end - start:.2f} m")
         c.restoreState()
     c.setFont("Helvetica-Bold", 5.5)
     for index, value in enumerate([0.0, 5.4, 7.3, 11.3, 15.0], start=1):
@@ -165,7 +169,9 @@ def _draw_dimensions(c: canvas.Canvas, plan_x: float, plan_y: float, scale: floa
     c.restoreState()
 
 
-def _draw_base_plan(c: canvas.Canvas, plan_x: float, plan_y: float, scale: float) -> None:
+def _draw_base_plan(
+    c: canvas.Canvas, plan_x: float, plan_y: float, scale: float
+) -> None:
     c.setFillColor(colors.white)
     c.rect(plan_x, plan_y, 15 * scale, 10 * scale, fill=1, stroke=0)
     for wall_id, start, end, thickness in WALLS:
@@ -182,7 +188,7 @@ def _draw_base_plan(c: canvas.Canvas, plan_x: float, plan_y: float, scale: float
         c.drawCentredString(cx, cy + 5, label)
         c.setFont("Helvetica", 5.7)
         c.drawCentredString(cx, cy - 3, str(room_index))
-        c.drawCentredString(cx, cy - 11, f"{(x1-x0)*(y1-y0):.1f} m²")
+        c.drawCentredString(cx, cy - 11, f"{(x1 - x0) * (y1 - y0):.1f} m²")
     for _, opening_type, wall_id, center, width, _, _ in OPENINGS:
         cx, cy = _xy(center[0], center[1], plan_x, plan_y, scale)
         c.setStrokeColor(colors.white)
@@ -197,11 +203,11 @@ def _draw_base_plan(c: canvas.Canvas, plan_x: float, plan_y: float, scale: float
         if opening_type == "window":
             half = width * scale / 2
             if horizontal:
-                c.line(cx-half, cy-2, cx+half, cy-2)
-                c.line(cx-half, cy+2, cx+half, cy+2)
+                c.line(cx - half, cy - 2, cx + half, cy - 2)
+                c.line(cx - half, cy + 2, cx + half, cy + 2)
             else:
-                c.line(cx-2, cy-half, cx-2, cy+half)
-                c.line(cx+2, cy-half, cx+2, cy+half)
+                c.line(cx - 2, cy - half, cx - 2, cy + half)
+                c.line(cx + 2, cy - half, cx + 2, cy + half)
         else:
             leaf = min(width * scale, 23)
             if horizontal:
@@ -224,7 +230,9 @@ def _draw_architecture(c: canvas.Canvas, px: float, py: float, scale: float) -> 
             c.roundRect(x - 15, y - 7, 30, 14, 3, fill=1, stroke=1)
     c.setFillColor(GREEN)
     c.setFont("Helvetica-Bold", 6)
-    c.drawString(px + 7.4 * scale, py + 2.55 * scale, "FULL-HEIGHT OPENING / ALIGN WITH ISLAND")
+    c.drawString(
+        px + 7.4 * scale, py + 2.55 * scale, "FULL-HEIGHT OPENING / ALIGN WITH ISLAND"
+    )
     c.setStrokeColor(colors.HexColor("#7E8B83"))
     c.setFillColor(colors.HexColor("#F4F6F5"))
     c.setLineWidth(0.65)
@@ -316,7 +324,9 @@ def _draw_mechanical(c: canvas.Canvas, px: float, py: float, scale: float) -> No
 
 def _draw_sheet(path: Path, discipline: str, sheet: str, title: str) -> None:
     width, height = landscape(TABLOID)
-    c = canvas.Canvas(str(path), pagesize=(width, height), pageCompression=1, invariant=1)
+    c = canvas.Canvas(
+        str(path), pagesize=(width, height), pageCompression=1, invariant=1
+    )
     c.setTitle(f"Cooper Residence Renovation - {title} {sheet}")
     c.setAuthor("Northstar Builders / BUILI synthetic coordinated demo")
     c.setFillColor(colors.white)
@@ -329,10 +339,21 @@ def _draw_sheet(path: Path, discipline: str, sheet: str, title: str) -> None:
     c.drawString(margin + 12, height - margin - 24, "COOPER RESIDENCE RENOVATION")
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
-    c.drawString(margin + 12, height - margin - 39, f"{discipline.upper()} / {title.upper()} / COORDINATED DEMO SET")
-    c.setStrokeColor({"Architectural": GREEN, "Electrical": BLUE, "Mechanical": ORANGE}[discipline])
+    c.drawString(
+        margin + 12,
+        height - margin - 39,
+        f"{discipline.upper()} / {title.upper()} / COORDINATED DEMO SET",
+    )
+    c.setStrokeColor(
+        {"Architectural": GREEN, "Electrical": BLUE, "Mechanical": ORANGE}[discipline]
+    )
     c.setLineWidth(3)
-    c.line(margin, height - margin - 0.72 * inch, width - margin, height - margin - 0.72 * inch)
+    c.line(
+        margin,
+        height - margin - 0.72 * inch,
+        width - margin,
+        height - margin - 0.72 * inch,
+    )
 
     plan_x, plan_y, scale = margin + 0.56 * inch, margin + 1.18 * inch, 46.0
     _draw_base_plan(c, plan_x, plan_y, scale)
@@ -375,19 +396,27 @@ def _draw_sheet(path: Path, discipline: str, sheet: str, title: str) -> None:
     c.line(margin, margin + 0.65 * inch, width - margin, margin + 0.65 * inch)
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin + 10, margin + 27, "NORTHSTAR BUILDERS / BUILI COORDINATED DEMO")
+    c.drawString(
+        margin + 10, margin + 27, "NORTHSTAR BUILDERS / BUILI COORDINATED DEMO"
+    )
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 6.7)
-    c.drawString(margin + 10, margin + 14, "Synthetic project record / not for construction")
+    c.drawString(
+        margin + 10, margin + 14, "Synthetic project record / not for construction"
+    )
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 20)
     c.drawRightString(width - margin - 12, margin + 27, sheet)
     c.setFont("Helvetica", 6.7)
-    c.drawRightString(width - margin - 12, margin + 13, "REV 03 / 2026-07-11 / ISSUED FOR REVIEW")
+    c.drawRightString(
+        width - margin - 12, margin + 13, "REV 03 / 2026-07-11 / ISSUED FOR REVIEW"
+    )
     c.save()
 
 
-def _fixture_rows(rows: list[tuple[str, str, str, list[float]]]) -> list[dict[str, Any]]:
+def _fixture_rows(
+    rows: list[tuple[str, str, str, list[float]]],
+) -> list[dict[str, Any]]:
     return [
         {
             "type": fixture_type,
@@ -401,6 +430,12 @@ def _fixture_rows(rows: list[tuple[str, str, str, list[float]]]) -> list[dict[st
 
 
 def _fixture_manifest_rows() -> list[dict[str, Any]]:
+    registry_path = WEB / "fixture-assets" / "registry.json"
+    asset_registry = (
+        json.loads(registry_path.read_text(encoding="utf-8")).get("assets", {})
+        if registry_path.exists()
+        else {}
+    )
     rows: list[dict[str, Any]] = []
     for discipline, fixtures in (
         ("architectural", ARCH_FIXTURES),
@@ -408,6 +443,7 @@ def _fixture_manifest_rows() -> list[dict[str, Any]]:
         ("mechanical", MECHANICAL_FIXTURES),
     ):
         for entity_id, fixture_type, room_id, center in fixtures:
+            registered_asset = asset_registry.get(fixture_type, {})
             if fixture_type in {"ceiling_light", "ceiling_diffuser", "ceiling_return"}:
                 elevation = 2.55
             elif fixture_type == "electrical_panel":
@@ -418,40 +454,102 @@ def _fixture_manifest_rows() -> list[dict[str, Any]]:
                 elevation = 0.72
             else:
                 elevation = 0.45
-            rows.append({
-                "id": entity_id,
-                "type": fixture_type,
-                "discipline": discipline,
-                "roomId": room_id,
-                "position": [center[0], elevation, center[1]],
-                "geometryRole": "review_visualization",
-                "source": "procedural_asset_library_v1",
-            })
+            rows.append(
+                {
+                    "id": entity_id,
+                    "type": fixture_type,
+                    "discipline": discipline,
+                    "roomId": room_id,
+                    "position": [center[0], elevation, center[1]],
+                    "geometryRole": "review_visualization",
+                    "asset": {
+                        "uri": registered_asset.get(
+                            "uri", f"/demo/fixture-assets/{fixture_type}.glb"
+                        ),
+                        "registry": "/demo/fixture-assets/registry.json",
+                        "sha256": registered_asset.get("sha256"),
+                        "scale": [1.0, 1.0, 1.0],
+                        "rotationEuler": [0.0, 0.0, 0.0],
+                        "status": "approved_demo_seed",
+                    },
+                    "source": "approved_glb_asset_registry_v1",
+                }
+            )
     return rows
 
 
-def _graph(sheet: str, source_path: Path, fixtures: list[tuple[str, str, str, list[float]]]) -> dict[str, Any]:
+def _graph(
+    sheet: str, source_path: Path, fixtures: list[tuple[str, str, str, list[float]]]
+) -> dict[str, Any]:
     digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
     raw = {
         "project_id": "cooper_demo",
         "sheet_id": sheet,
-        "scale": {"px_per_meter": 46.0, "source": "coordinated_demo_cad", "confidence": 0.99},
+        "scale": {
+            "px_per_meter": 46.0,
+            "source": "coordinated_demo_cad",
+            "confidence": 0.99,
+        },
         "rooms": [
-            {"id": room_id, "name": name.title(), "polygon": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], "confidence": 0.99}
+            {
+                "id": room_id,
+                "name": name.title(),
+                "polygon": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
+                "confidence": 0.99,
+            }
             for room_id, name, x0, y0, x1, y1 in ROOMS
         ],
         "walls": [
-            {"id": wall_id, "room_id": "", "from": start, "to": end, "height_m": 2.8, "thickness_m": thickness, "confidence": 0.99}
+            {
+                "id": wall_id,
+                "room_id": "",
+                "from": start,
+                "to": end,
+                "height_m": 2.8,
+                "thickness_m": thickness,
+                "confidence": 0.99,
+            }
             for wall_id, start, end, thickness in WALLS
         ],
         "openings": [
-            {"type": opening_type, "wall_id": wall_id, "center_m": center, "width_m": width, "height_m": height, "sill_height_m": sill, "source_entity_id": entity_id, "confidence": 0.99}
+            {
+                "type": opening_type,
+                "wall_id": wall_id,
+                "center_m": center,
+                "width_m": width,
+                "height_m": height,
+                "sill_height_m": sill,
+                "source_entity_id": entity_id,
+                "confidence": 0.99,
+            }
             for entity_id, opening_type, wall_id, center, width, height, sill in OPENINGS
         ],
         "fixtures": _fixture_rows(fixtures),
-        "sources": [{"doc_id": f"doc_{sheet.lower().replace('.', '_')}", "sheet_id": sheet, "page": 1, "bbox": [0, 0, 15, 10], "source_type": "coordinated_cad_plan", "source_strength": "strong", "revision": "03", "source_hash": digest}],
-        "provenance": {"source_doc_id": f"doc_{sheet.lower().replace('.', '_')}", "source_hash": digest, "source_revision": "03", "source_revision_id": f"rev_{sheet.lower().replace('.', '_')}_03", "source_revision_state": "current", "source_issue_date": "2026-07-11", "source_filename": source_path.name},
-        "extraction": {"method": "coordinated_demo_cad_to_plan_graph_v1", "source_doc_id": f"doc_{sheet.lower().replace('.', '_')}"},
+        "sources": [
+            {
+                "doc_id": f"doc_{sheet.lower().replace('.', '_')}",
+                "sheet_id": sheet,
+                "page": 1,
+                "bbox": [0, 0, 15, 10],
+                "source_type": "coordinated_cad_plan",
+                "source_strength": "strong",
+                "revision": "03",
+                "source_hash": digest,
+            }
+        ],
+        "provenance": {
+            "source_doc_id": f"doc_{sheet.lower().replace('.', '_')}",
+            "source_hash": digest,
+            "source_revision": "03",
+            "source_revision_id": f"rev_{sheet.lower().replace('.', '_')}_03",
+            "source_revision_state": "current",
+            "source_issue_date": "2026-07-11",
+            "source_filename": source_path.name,
+        },
+        "extraction": {
+            "method": "coordinated_demo_cad_to_plan_graph_v1",
+            "source_doc_id": f"doc_{sheet.lower().replace('.', '_')}",
+        },
     }
     return finalize_plan_graph_payload(raw)
 
@@ -490,17 +588,19 @@ def main() -> None:
         graph_name = f"{sheet}-plan-graph.json"
         (DEMO / graph_name).write_text(json.dumps(graph, indent=2), encoding="utf-8")
         shutil.copy2(DEMO / graph_name, WEB / graph_name)
-        manifest_sheets.append({
-            "sheet": sheet,
-            "discipline": discipline,
-            "title": title.title(),
-            "revision": "03",
-            "pdf": f"/demo/{filename}",
-            "preview": f"/demo/{preview_name}",
-            "planGraph": f"/demo/{graph_name}",
-            "roomCount": len(graph["rooms"]),
-            "fixtureCount": len(graph["fixtures"]),
-        })
+        manifest_sheets.append(
+            {
+                "sheet": sheet,
+                "discipline": discipline,
+                "title": title.title(),
+                "revision": "03",
+                "pdf": f"/demo/{filename}",
+                "preview": f"/demo/{preview_name}",
+                "planGraph": f"/demo/{graph_name}",
+                "roomCount": len(graph["rooms"]),
+                "fixtureCount": len(graph["fixtures"]),
+            }
+        )
 
     combined = _graph(
         "A1.1/E1.1/M1.1",
@@ -532,25 +632,54 @@ def main() -> None:
         "sheets": manifest_sheets,
         "model": {"uri": f"/demo/{model_name}", **model_metadata},
         "rooms": [
-            {"id": room_id, "name": name.title(), "position": [(x0 + x1) / 2, 0.08, (y0 + y1) / 2]}
+            {
+                "id": room_id,
+                "name": name.title(),
+                "position": [(x0 + x1) / 2, 0.08, (y0 + y1) / 2],
+            }
             for room_id, name, x0, y0, x1, y1 in ROOMS
         ],
         "fixtures": _fixture_manifest_rows(),
         "fixtureAssetStrategy": {
             "spatialTruth": "PlanGraph coordinates and source dimensions",
-            "visualLayer": "procedural_asset_library_v1",
-            "futureGeneratedAssets": "Optional Tripo or curated GLB assets must remain non-authoritative presentation geometry",
+            "visualLayer": "approved_glb_asset_registry_v1",
+            "fallback": "procedural_asset_library_v1",
+            "futureGeneratedAssets": "Tripo or curated GLB assets are copied into BUILI storage, validated, manually approved, and remain non-authoritative presentation geometry",
         },
         "issues": [
-            {"id": "BUI-1042", "position": [5.12, 0.72, 2.15], "sheet": "E1.1", "tone": "critical"},
-            {"id": "BUI-1038", "position": [11.2, 1.0, 7.1], "sheet": "A1.1", "tone": "warning"},
-            {"id": "RFI-017", "position": [7.05, 2.35, 6.5], "sheet": "M1.1", "tone": "info"},
+            {
+                "id": "BUI-1042",
+                "position": [5.12, 0.72, 2.15],
+                "sheet": "E1.1",
+                "tone": "critical",
+            },
+            {
+                "id": "BUI-1038",
+                "position": [11.2, 1.0, 7.1],
+                "sheet": "A1.1",
+                "tone": "warning",
+            },
+            {
+                "id": "RFI-017",
+                "position": [7.05, 2.35, 6.5],
+                "sheet": "M1.1",
+                "tone": "info",
+            },
         ],
     }
     manifest_path = DEMO / "drawing-set.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     shutil.copy2(manifest_path, WEB / manifest_path.name)
-    print(json.dumps({"sheets": len(manifest_sheets), "model": model_name, "metadata": model_metadata}, indent=2))
+    print(
+        json.dumps(
+            {
+                "sheets": len(manifest_sheets),
+                "model": model_name,
+                "metadata": model_metadata,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

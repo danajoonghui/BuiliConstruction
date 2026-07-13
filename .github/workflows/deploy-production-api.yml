@@ -1,0 +1,103 @@
+name: deploy-production-api
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: buili-production-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment: production
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_certificate_arn: ${{ vars.ACM_CERTIFICATE_ARN }}
+      TF_VAR_image_tag: ${{ github.sha }}
+      TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_external_ai_enabled: ${{ vars.EXTERNAL_AI_ENABLED || 'false' }}
+      TF_VAR_openai_model: ${{ vars.OPENAI_MODEL }}
+      TF_VAR_tripo_enabled: ${{ vars.TRIPO_ENABLED || 'false' }}
+      TF_VAR_tripo_model_version: ${{ vars.TRIPO_MODEL_VERSION || 'P1-20260311' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Initialize protected Terraform state
+        run: >-
+          terraform -chdir=infra/terraform init
+          -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          -backend-config="key=${{ vars.TF_STATE_KEY }}"
+          -backend-config="region=${{ env.AWS_REGION }}"
+          -backend-config="encrypt=true"
+          -backend-config="use_lockfile=true"
+
+      - name: Validate reviewed infrastructure
+        run: |
+          terraform -chdir=infra/terraform fmt -check -recursive
+          terraform -chdir=infra/terraform validate
+
+      - name: Ensure the API image repository exists
+        run: terraform -chdir=infra/terraform apply -auto-approve -target=aws_ecr_repository.api
+
+      - name: Resolve image repository
+        id: repository
+        run: echo "url=$(terraform -chdir=infra/terraform output -raw api_repository_url)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate Docker to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push immutable API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.repository.outputs.url }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Register migration task without promoting services
+        run: terraform -chdir=infra/terraform apply -auto-approve -target=aws_ecs_task_definition.migration
+
+      - name: Run the one-shot database migration gate
+        shell: bash
+        run: |
+          cluster=$(terraform -chdir=infra/terraform output -raw ecs_cluster_arn)
+          task_definition=$(terraform -chdir=infra/terraform output -raw migration_task_definition_arn)
+          security_group=$(terraform -chdir=infra/terraform output -raw worker_security_group_id)
+          mapfile -t subnets < <(terraform -chdir=infra/terraform output -json private_subnet_ids | jq -r '.[]')
+          task=$(aws ecs run-task \
+            --cluster "$cluster" \
+            --task-definition "$task_definition" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${subnets[0]},${subnets[1]}],securityGroups=[$security_group],assignPublicIp=DISABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          test -n "$task" && test "$task" != "None"
+          aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task"
+          exit_code=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task" \
+            --query 'tasks[0].containers[?name==`migration`].exitCode | [0]' --output text)
+          test "$exit_code" = "0"
+
+      - name: Plan complete production promotion
+        run: terraform -chdir=infra/terraform plan -out=production.tfplan
+
+      - name: Promote API and workers
+        run: terraform -chdir=infra/terraform apply -auto-approve production.tfplan
+
+      - name: Verify readiness through Cloudflare
+        run: curl --fail --retry 12 --retry-delay 10 --retry-all-errors https://api.builiconstruction.com/health/ready

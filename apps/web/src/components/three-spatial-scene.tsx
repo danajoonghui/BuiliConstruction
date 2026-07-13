@@ -10,7 +10,18 @@ type Manifest = {
   model: { uri: string };
   rooms: Array<{ id: string; name: string; position: [number, number, number] }>;
   issues: Array<{ id: string; position: [number, number, number]; tone: string }>;
-  fixtures: Array<{ id: string; type: string; discipline: string; position: [number, number, number] }>;
+  fixtures: Array<{
+    id: string;
+    type: string;
+    discipline: string;
+    position: [number, number, number];
+    asset?: {
+      uri: string;
+      scale?: [number, number, number];
+      rotationEuler?: [number, number, number];
+      status?: string;
+    };
+  }>;
 };
 
 function materialForFixture(discipline:string){
@@ -50,6 +61,44 @@ function addFixtureVisual(scene:THREE.Scene,fixture:Manifest['fixtures'][number]
     addBox(fixture.type==='casework'?[1.3,.045,.62]:[.9,.045,.56],[0,.47,0]);
   }else addBox([.42,.32,.42]);
   scene.add(group);
+}
+
+async function addApprovedFixtureAsset(
+  scene: THREE.Scene,
+  loader: GLTFLoader,
+  fixture: Manifest['fixtures'][number],
+  cache: Map<string, Promise<THREE.Group>>,
+) {
+  const uri = fixture.asset?.uri;
+  if (!uri) throw new Error('No approved asset URI');
+
+  let source = cache.get(uri);
+  if (!source) {
+    source = loader.loadAsync(uri).then(({ scene: loaded }) => {
+      loaded.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        child.geometry.computeVertexNormals();
+        child.castShadow = true;
+        child.receiveShadow = true;
+      });
+      return loaded;
+    });
+    cache.set(uri, source);
+  }
+
+  const instance = (await source).clone(true);
+  instance.name = `fixture_asset_${fixture.id}`;
+  instance.position.set(...fixture.position);
+  if (fixture.asset?.scale) instance.scale.set(...fixture.asset.scale);
+  if (fixture.asset?.rotationEuler) instance.rotation.set(...fixture.asset.rotationEuler);
+  instance.userData = {
+    ...instance.userData,
+    fixtureId: fixture.id,
+    semanticType: fixture.type,
+    discipline: fixture.discipline,
+    source: 'approved_glb_asset_registry',
+  };
+  scene.add(instance);
 }
 
 export function ThreeSpatialScene({
@@ -121,7 +170,8 @@ export function ThreeSpatialScene({
     scene.add(grid);
 
     const loader = new GLTFLoader();
-    fetch('/demo/drawing-set.json', { cache: 'force-cache' })
+    const fixtureAssetCache = new Map<string, Promise<THREE.Group>>();
+    fetch('/demo/drawing-set.json', { cache: 'no-store' })
       .then((response) => {
         if (!response.ok) throw new Error('Drawing-set manifest could not be loaded');
         return response.json() as Promise<Manifest>;
@@ -130,7 +180,7 @@ export function ThreeSpatialScene({
         if (disposed) return;
         loader.load(
           manifest.model.uri,
-          (gltf) => {
+          async (gltf) => {
             if (disposed) return;
             gltf.scene.traverse((child) => {
               if (!(child instanceof THREE.Mesh)) return;
@@ -163,7 +213,20 @@ export function ThreeSpatialScene({
             });
             scene.add(gltf.scene);
 
-            (manifest.fixtures||[]).forEach((fixture)=>addFixtureVisual(scene,fixture));
+            const assetResults = await Promise.allSettled(
+              (manifest.fixtures || []).map(async (fixture) => {
+                try {
+                  await addApprovedFixtureAsset(scene, loader, fixture, fixtureAssetCache);
+                  return 'approved';
+                } catch {
+                  addFixtureVisual(scene, fixture);
+                  return 'fallback';
+                }
+              }),
+            );
+            const fallbackCount = assetResults.filter(
+              (result) => result.status === 'fulfilled' && result.value === 'fallback',
+            ).length;
 
             manifest.rooms.forEach((room) => {
               const element = document.createElement('span');
@@ -196,7 +259,11 @@ export function ThreeSpatialScene({
               marker.add(label);
               scene.add(marker);
             });
-            setStatus('Coordinated A/E/M model · drag to orbit');
+            setStatus(
+              fallbackCount
+                ? `Coordinated model · ${fallbackCount} object fallback${fallbackCount === 1 ? '' : 's'}`
+                : 'Coordinated model · approved GLB object library',
+            );
           },
           undefined,
           () => {
@@ -258,7 +325,7 @@ export function ThreeSpatialScene({
     <div className={`three-spatial-root ${failed ? 'three-spatial-root--failed' : ''}`} ref={mountRef}>
       <div className="three-scene-status">{status}</div>
       <div className="three-scene-legend" aria-label="Model object legend">
-        <span><i className="three-scene-key three-scene-key--architectural" />Architectural fixtures</span>
+        <span><i className="three-scene-key three-scene-key--architectural" />Architectural GLB assets</span>
         <span><i className="three-scene-key three-scene-key--electrical" />Electrical devices</span>
         <span><i className="three-scene-key three-scene-key--mechanical" />Mechanical equipment</span>
       </div>

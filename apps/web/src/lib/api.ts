@@ -1,6 +1,9 @@
 import type { ApiResult } from './types';
 
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1').replace(/\/$/, '');
+const DEFAULT_API_URL = process.env.NODE_ENV === 'production'
+  ? 'https://api.builiconstruction.com/v1'
+  : 'http://localhost:8000/v1';
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code = 'API_ERROR') { super(message); }
@@ -76,7 +79,8 @@ export const authApi = {
   signIn: (input: { email: string; password: string }) => api.post<{ user: unknown; csrf_token:string }>('/auth/login', input),
   signUp: (input: { display_name: string; email: string; password: string; organization_name?: string }) => api.post<{ user: unknown; csrf_token:string }>('/auth/signup', input),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
-  exchangeGoogle: (idToken: string, organizationName?: string) => api.post<{ user: unknown; csrf_token:string }>('/auth/oidc/exchange', { id_token: idToken, organization_name: organizationName })
+  exchangeGoogle: (idToken: string, organizationName?: string) => api.post<{ user: unknown; csrf_token:string }>('/auth/oidc/exchange', { id_token: idToken, organization_name: organizationName }),
+  capabilities: () => api.get<{ google_oidc_enabled:boolean; google_client_id:string|null }>('/auth/capabilities')
 };
 
 export async function withDemoFallback<T>(load: () => Promise<T>, fallback: T, options: { demo?: boolean } = {}): Promise<{ data: T; demo: boolean }> {

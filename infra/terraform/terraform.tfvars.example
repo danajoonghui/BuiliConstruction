@@ -11,5 +11,10 @@ allowed_origins = "https://app.builiconstruction.com"
 # Secrets Manager JSON contains a new project-scoped OPENAI_API_KEY.
 external_ai_enabled = false
 
+# Optional generated presentation geometry. Enable only after adding a
+# project-scoped TRIPO_API_KEY to the BUILI Secrets Manager JSON.
+tripo_enabled       = false
+tripo_model_version = "P1-20260311"
+
 # Optional. The subscription does not receive alerts until it is confirmed.
 alarm_email = ""

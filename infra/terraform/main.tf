@@ -33,6 +33,8 @@ locals {
     { name = "OPENAI_MODEL", value = var.openai_model },
     { name = "OPENAI_TRANSCRIBE_MODEL", value = var.openai_transcribe_model },
     { name = "OPENAI_EMBEDDING_MODEL", value = var.openai_embedding_model },
+    { name = "BUILI_TRIPO_ENABLED", value = tostring(var.tripo_enabled) },
+    { name = "BUILI_TRIPO_MODEL_VERSION", value = var.tripo_model_version },
   ]
 
   common_runtime_secrets = concat(
@@ -43,6 +45,9 @@ locals {
     ],
     var.external_ai_enabled ? [
       { name = "OPENAI_API_KEY", valueFrom = "${aws_secretsmanager_secret.api.arn}:OPENAI_API_KEY::" },
+    ] : [],
+    var.tripo_enabled ? [
+      { name = "TRIPO_API_KEY", valueFrom = "${aws_secretsmanager_secret.api.arn}:TRIPO_API_KEY::" },
     ] : [],
   )
 

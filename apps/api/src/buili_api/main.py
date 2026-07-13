@@ -25,11 +25,12 @@ from .core.logging import configure_logging
 from .db import SessionFactory, engine
 from .demo import seed_demo
 from .deps import current_user, require_project
-from .models import Base, Evidence, Issue, Project, utcnow
+from .models import Base, Evidence, FixtureAsset, Issue, Project, utcnow
 from .routes import router
 from .services.ai import AIProvider
 from .services.documents import DocumentService
 from .services.email import EmailService
+from .services.fixture_assets import TripoFixtureAssetService
 from .services.issues import analyze_issue
 from .services.jobs import JobManager
 from .services.reports import ReportService
@@ -55,6 +56,7 @@ class Services:
     scanner: FileScanner
     rate_limiter: InProcessRateLimiter
     jobs: JobManager
+    fixture_assets: TripoFixtureAssetService
 
 
 def _json_dumps(value) -> bytes:
@@ -87,6 +89,7 @@ def build_services(settings: Settings) -> Services:
     scanner = FileScanner(settings)
     rate_limiter = InProcessRateLimiter()
     jobs = JobManager(settings)
+    fixture_assets = TripoFixtureAssetService(settings, storage)
     result = Services(
         storage=storage,
         ai=ai,
@@ -98,6 +101,7 @@ def build_services(settings: Settings) -> Services:
         scanner=scanner,
         rate_limiter=rate_limiter,
         jobs=jobs,
+        fixture_assets=fixture_assets,
     )
 
     async def document_ingest(session, job):
@@ -109,7 +113,9 @@ def build_services(settings: Settings) -> Services:
             raise ValueError("evidence not found")
         data = await storage.read_bytes(evidence.storage_key) if evidence.storage_key else None
         project = await session.get(Project, evidence.project_id)
-        external_ai_allowed = bool((project.metadata_json if project else {}).get("external_ai_allowed", False))
+        external_ai_allowed = bool(
+            (project.metadata_json if project else {}).get("external_ai_allowed", False)
+        )
         local_analysis = None
         if data:
             try:
@@ -122,18 +128,28 @@ def build_services(settings: Settings) -> Services:
                     temporary.write(data)
                     temporary_path = Path(temporary.name)
                 try:
-                    kind = "audio" if evidence.kind == "voice_note" else (
-                        "image" if evidence.kind in {"photo", "scan"} else "document"
+                    kind = (
+                        "audio"
+                        if evidence.kind == "voice_note"
+                        else ("image" if evidence.kind in {"photo", "scan"} else "document")
                     )
-                    local_analysis = build_default_analysis_service(allow_external=False).analyze(
-                        temporary_path, kind=kind
-                    ).model_dump(mode="json")
+                    local_analysis = (
+                        build_default_analysis_service(allow_external=False)
+                        .analyze(temporary_path, kind=kind)
+                        .model_dump(mode="json")
+                    )
                 finally:
                     temporary_path.unlink(missing_ok=True)
             except Exception as exc:
-                local_analysis = {"provider": "deterministic_local", "warnings": [{"code": "LOCAL_MEDIA_ANALYSIS_FAILED", "message": str(exc)}], "review_required": True}
+                local_analysis = {
+                    "provider": "deterministic_local",
+                    "warnings": [{"code": "LOCAL_MEDIA_ANALYSIS_FAILED", "message": str(exc)}],
+                    "review_required": True,
+                }
         if evidence.kind == "voice_note" and data and not evidence.transcript:
-            evidence.transcript = await ai.transcribe(evidence.title + ".mp3", data, external_allowed=external_ai_allowed)
+            evidence.transcript = await ai.transcribe(
+                evidence.title + ".mp3", data, external_allowed=external_ai_allowed
+            )
         analysis, provider = await ai.analyze_evidence(
             title=evidence.title,
             description=evidence.description,
@@ -142,9 +158,20 @@ def build_services(settings: Settings) -> Services:
             data=data,
             external_allowed=external_ai_allowed,
         )
-        evidence.analysis_json = {"local": local_analysis, "semantic": analysis, "provider": provider}
+        evidence.analysis_json = {
+            "local": local_analysis,
+            "semantic": analysis,
+            "provider": provider,
+        }
         searchable = "\n".join(
-            value for value in [evidence.title, evidence.description, evidence.transcript, analysis.get("summary", "")] if value
+            value
+            for value in [
+                evidence.title,
+                evidence.description,
+                evidence.transcript,
+                analysis.get("summary", ""),
+            ]
+            if value
         )
         chunks = await search.replace_source(
             session,
@@ -156,7 +183,12 @@ def build_services(settings: Settings) -> Services:
             metadata={"kind": evidence.kind, "location": evidence.location_json},
             external_ai_allowed=external_ai_allowed,
         )
-        return {"evidence_id": evidence.id, "provider": provider, "chunks": chunks, "analysis": analysis}
+        return {
+            "evidence_id": evidence.id,
+            "provider": provider,
+            "chunks": chunks,
+            "analysis": analysis,
+        }
 
     async def issue_analyze(session, job):
         issue = await session.get(Issue, str(job.input_json["issue_id"]))
@@ -168,6 +200,14 @@ def build_services(settings: Settings) -> Services:
     jobs.register("evidence.analyze", evidence_analyze)
     jobs.register("issue.analyze", issue_analyze)
     jobs.register("spatial.generate", spatial.generate)
+
+    async def fixture_asset_generate(session, job):
+        asset = await session.get(FixtureAsset, str(job.input_json["fixture_asset_id"]))
+        if asset is None:
+            raise ValueError("fixture asset not found")
+        return await fixture_assets.generate(session, asset)
+
+    jobs.register("fixture_asset.generate", fixture_asset_generate)
 
     async def upload_scan(session, job):
         from .models import Upload
@@ -181,10 +221,18 @@ def build_services(settings: Settings) -> Services:
         except AppError as exc:
             upload.scan_status = "infected" if exc.code == "MALWARE_DETECTED" else "error"
             upload.status = "rejected" if exc.code == "MALWARE_DETECTED" else "quarantined"
-            upload.scan_result_json = {"code": exc.code, "message": exc.message, "details": exc.details}
+            upload.scan_result_json = {
+                "code": exc.code,
+                "message": exc.message,
+                "details": exc.details,
+            }
             upload.scanned_at = utcnow()
             if exc.code == "MALWARE_DETECTED":
-                return {"upload_id": upload.id, "status": upload.scan_status, "error": upload.scan_result_json}
+                return {
+                    "upload_id": upload.id,
+                    "status": upload.scan_status,
+                    "error": upload.scan_result_json,
+                }
             # Persist the honest indeterminate verdict, then let SQS retry and
             # eventually move the job to its DLQ rather than silently accepting.
             await session.commit()
@@ -245,29 +293,52 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID", "X-CSRF-Token"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Idempotency-Key",
+            "X-Request-ID",
+            "X-CSRF-Token",
+        ],
         expose_headers=["X-Request-ID"],
     )
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
         supplied = request.headers.get("x-request-id", "")
-        request_id = supplied if re.fullmatch(r"[A-Za-z0-9_.:-]{8,64}", supplied) else f"req_{uuid.uuid4().hex}"
+        request_id = (
+            supplied
+            if re.fullmatch(r"[A-Za-z0-9_.:-]{8,64}", supplied)
+            else f"req_{uuid.uuid4().hex}"
+        )
         request.state.request_id = request_id
         structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(request_id=request_id, method=request.method, path=request.url.path)
+        structlog.contextvars.bind_contextvars(
+            request_id=request_id, method=request.method, path=request.url.path
+        )
         # The production ALB accepts traffic only from Cloudflare, and Cloudflare
         # injects this per-origin secret.  IP allow-listing alone is insufficient
         # because another Cloudflare customer could otherwise proxy to the ALB.
         # Health probes are direct ALB/ECS traffic and intentionally exempt.
-        if settings.environment == "production" and request.url.path not in {"/health/live", "/health/ready"}:
-            expected_origin = settings.origin_verify_secret.get_secret_value() if settings.origin_verify_secret else ""
+        if settings.environment == "production" and request.url.path not in {
+            "/health/live",
+            "/health/ready",
+        }:
+            expected_origin = (
+                settings.origin_verify_secret.get_secret_value()
+                if settings.origin_verify_secret
+                else ""
+            )
             supplied_origin = request.headers.get("x-buili-origin-verify", "")
             if not supplied_origin or not secrets.compare_digest(supplied_origin, expected_origin):
                 return JSONResponse(
                     status_code=403,
                     content={
-                        "error": {"code": "ORIGIN_VERIFICATION_FAILED", "message": "Request origin is not trusted", "details": {}},
+                        "error": {
+                            "code": "ORIGIN_VERIFICATION_FAILED",
+                            "message": "Request origin is not trusted",
+                            "details": {},
+                        },
                         "request_id": request_id,
                     },
                     headers={"X-Request-ID": request_id},
@@ -290,7 +361,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return JSONResponse(
                     status_code=429,
                     content={
-                        "error": {"code": "RATE_LIMITED", "message": "Too many authentication requests", "details": {}},
+                        "error": {
+                            "code": "RATE_LIMITED",
+                            "message": "Too many authentication requests",
+                            "details": {},
+                        },
                         "request_id": request_id,
                     },
                     headers={"Retry-After": "60", "X-Request-ID": request_id},
@@ -307,14 +382,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         cookie_auth = not request.headers.get("authorization") and bool(
             request.cookies.get("buili_access") or request.cookies.get("buili_refresh")
         )
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and cookie_auth and request.url.path not in csrf_exempt:
+        if (
+            request.method in {"POST", "PUT", "PATCH", "DELETE"}
+            and cookie_auth
+            and request.url.path not in csrf_exempt
+        ):
             cookie_csrf = request.cookies.get("buili_csrf", "")
             header_csrf = request.headers.get("x-csrf-token", "")
-            if not cookie_csrf or not header_csrf or not secrets.compare_digest(cookie_csrf, header_csrf):
+            if (
+                not cookie_csrf
+                or not header_csrf
+                or not secrets.compare_digest(cookie_csrf, header_csrf)
+            ):
                 return JSONResponse(
                     status_code=403,
                     content={
-                        "error": {"code": "CSRF_VALIDATION_FAILED", "message": "CSRF token is missing or invalid", "details": {}},
+                        "error": {
+                            "code": "CSRF_VALIDATION_FAILED",
+                            "message": "CSRF token is missing or invalid",
+                            "details": {},
+                        },
                         "request_id": request_id,
                     },
                     headers={"X-Request-ID": request_id},
@@ -367,7 +454,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(Exception)
     async def unhandled_error(request: Request, exc: Exception):
         await logger.aexception("request.unhandled_error", error=str(exc))
-        message = str(exc) if settings.environment in {"development", "test"} else "An unexpected error occurred"
+        message = (
+            str(exc)
+            if settings.environment in {"development", "test"}
+            else "An unexpected error occurred"
+        )
         return JSONResponse(
             status_code=500,
             content={

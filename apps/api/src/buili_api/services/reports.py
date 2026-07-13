@@ -192,6 +192,12 @@ class ReportService:
             value = report_fields.get(name)
             return str(value).strip() if value not in (None, "") else fallback
 
+        def object_rows(name: str) -> list[dict[str, Any]]:
+            value = report_fields.get(name)
+            if not isinstance(value, list):
+                return []
+            return [dict(item) for item in value if isinstance(item, dict)]
+
         assignee = people.get(issue.assigned_to or "", "Project assignee")
         preparer = people.get(generated_by, "BUILI project reviewer")
         approver = people.get(issue.approved_by or "", "Project manager review required")
@@ -205,9 +211,9 @@ class ReportService:
             "completion_requirement",
             "Upload corrected-condition evidence at the same location and obtain reviewer acceptance.",
         )
-        line_items = report_fields.get("line_items") if isinstance(report_fields.get("line_items"), list) else []
-        manpower = report_fields.get("manpower") if isinstance(report_fields.get("manpower"), list) else []
-        activity_log = report_fields.get("activity_log") if isinstance(report_fields.get("activity_log"), list) else []
+        line_items = object_rows("line_items")
+        manpower = object_rows("manpower")
+        activity_log = object_rows("activity_log")
 
         return ReportContext(
             report_id=report_id,

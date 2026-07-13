@@ -55,9 +55,9 @@ def test_demo_document_extracts_compact_sheet_revision_and_issue_status() -> Non
     )
     assert result.source_sha256
     assert result.metadata["sheet_number_candidates"] == ["E1.1"]
-    assert result.metadata["revision_candidates"] == ["2"]
+    assert result.metadata["revision_candidates"] == ["03"]
     assert result.metadata["issue_status_candidates"] == ["REVIEW"]
-    assert "18 INCHES MINIMUM" in result.extracted_text
+    assert "18 IN. AFF MINIMUM" in result.extracted_text
 
 
 def test_demo_audio_uses_reviewed_sidecar_and_image_quality_is_measured() -> None:

@@ -34,6 +34,7 @@ uploads/
 storage/
 tmp/
 output/generated_spatial/
+output/qa/
 *.log
 plan_graph.json
 logs/
