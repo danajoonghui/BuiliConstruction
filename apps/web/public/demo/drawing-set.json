@@ -1,0 +1,528 @@
+{
+  "project": "Cooper Residence Renovation",
+  "coordinateSystem": "BUILI-DEMO-METRIC-01",
+  "units": "meters",
+  "calibrationConfidence": 0.99,
+  "sheets": [
+    {
+      "sheet": "A1.1",
+      "discipline": "Architectural",
+      "title": "Ground Floor Architectural Plan",
+      "revision": "03",
+      "pdf": "/demo/cooper-residence-A1.1-demo.pdf",
+      "preview": "/demo/A1.1-preview.png",
+      "planGraph": "/demo/A1.1-plan-graph.json",
+      "roomCount": 10,
+      "fixtureCount": 4
+    },
+    {
+      "sheet": "E1.1",
+      "discipline": "Electrical",
+      "title": "Power And Lighting Plan",
+      "revision": "03",
+      "pdf": "/demo/cooper-residence-E1.1-demo.pdf",
+      "preview": "/demo/E1.1-preview.png",
+      "planGraph": "/demo/E1.1-plan-graph.json",
+      "roomCount": 10,
+      "fixtureCount": 12
+    },
+    {
+      "sheet": "M1.1",
+      "discipline": "Mechanical",
+      "title": "Hvac Distribution Plan",
+      "revision": "03",
+      "pdf": "/demo/cooper-residence-M1.1-demo.pdf",
+      "preview": "/demo/M1.1-preview.png",
+      "planGraph": "/demo/M1.1-plan-graph.json",
+      "roomCount": 10,
+      "fixtureCount": 8
+    }
+  ],
+  "model": {
+    "uri": "/demo/cooper-residence-coordinated-review.glb",
+    "format": "glb",
+    "assembly": "deterministic_plangraph_aperture_geometry_v2",
+    "rooms": 10,
+    "walls": 11,
+    "openings": 16,
+    "fixtures": 24,
+    "vertex_count": 636,
+    "triangle_count": 880,
+    "mesh_parts": [
+      "floor",
+      "walls",
+      "fixtures"
+    ],
+    "floor_polygon_parts": 1,
+    "wall_source_segments": 11,
+    "wall_polygon_parts": 11,
+    "wall_union_enabled": false,
+    "opening_cut_count": 16,
+    "geometry_warnings": [],
+    "grid": {
+      "origin_m": [
+        -1.0,
+        -1.0
+      ],
+      "spacing_m": 1.0,
+      "bounds_m": [
+        [
+          -0.11,
+          -0.11
+        ],
+        [
+          15.11,
+          10.11
+        ]
+      ]
+    },
+    "source_required_for_strong_evidence": true,
+    "plan_graph_schema_version": "buili.plan-graph.v2",
+    "source_fingerprint": "9e3dec31a4c2ad9eadb95502dc95a90dbb18255b33ef1baeb05685a33c0f96eb",
+    "plan_graph_content_sha256": "9625ffa8ce1c82b719fc38955d8c759bb12104a892804b8a6e23c6aa2d30d0a3",
+    "artifact_sha256": "a6e9102ce61c5d6453d0e25a4676fd62e7674e7d4403508236ce668279232c65"
+  },
+  "rooms": [
+    {
+      "id": "garage",
+      "name": "Garage",
+      "position": [
+        2.7,
+        0.08,
+        2.9
+      ]
+    },
+    {
+      "id": "entry",
+      "name": "Entry",
+      "position": [
+        6.35,
+        0.08,
+        1.2
+      ]
+    },
+    {
+      "id": "laundry",
+      "name": "Laundry",
+      "position": [
+        6.35,
+        0.08,
+        4.1
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen",
+      "position": [
+        9.35,
+        0.08,
+        4.1
+      ]
+    },
+    {
+      "id": "living",
+      "name": "Living Room",
+      "position": [
+        13.2,
+        0.08,
+        2.9
+      ]
+    },
+    {
+      "id": "bedroom_1",
+      "name": "Bedroom 1",
+      "position": [
+        2.7,
+        0.08,
+        7.9
+      ]
+    },
+    {
+      "id": "hall",
+      "name": "Hall",
+      "position": [
+        6.35,
+        0.08,
+        6.5
+      ]
+    },
+    {
+      "id": "bath",
+      "name": "Bath",
+      "position": [
+        6.35,
+        0.08,
+        8.6
+      ]
+    },
+    {
+      "id": "bedroom_2",
+      "name": "Bedroom 2",
+      "position": [
+        9.25,
+        0.08,
+        7.9
+      ]
+    },
+    {
+      "id": "office",
+      "name": "Office",
+      "position": [
+        13.1,
+        0.08,
+        7.9
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "kitchen_island",
+      "type": "casework",
+      "discipline": "architectural",
+      "roomId": "kitchen",
+      "position": [
+        9.4,
+        0.45,
+        4.1
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "kitchen_sink",
+      "type": "sink",
+      "discipline": "architectural",
+      "roomId": "kitchen",
+      "position": [
+        10.7,
+        0.45,
+        5.25
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "bath_vanity",
+      "type": "vanity",
+      "discipline": "architectural",
+      "roomId": "bath",
+      "position": [
+        6.7,
+        0.45,
+        8.9
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "laundry_casework",
+      "type": "casework",
+      "discipline": "architectural",
+      "roomId": "laundry",
+      "position": [
+        6.6,
+        0.45,
+        3.1
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "panel_ep1",
+      "type": "electrical_panel",
+      "discipline": "electrical",
+      "roomId": "garage",
+      "position": [
+        0.45,
+        1.35,
+        3.2
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "gfci_issue",
+      "type": "receptacle",
+      "discipline": "electrical",
+      "roomId": "garage",
+      "position": [
+        5.18,
+        0.46,
+        2.15
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "garage_light_1",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "garage",
+      "position": [
+        1.8,
+        2.55,
+        2.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "garage_light_2",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "garage",
+      "position": [
+        3.7,
+        2.55,
+        2.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "entry_light",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "entry",
+      "position": [
+        6.35,
+        2.55,
+        1.25
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "kitchen_light_1",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "kitchen",
+      "position": [
+        8.5,
+        2.55,
+        4.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "kitchen_light_2",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "kitchen",
+      "position": [
+        10.2,
+        2.55,
+        4.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "living_light_1",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "living",
+      "position": [
+        12.5,
+        2.55,
+        2.5
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "living_light_2",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "living",
+      "position": [
+        14.0,
+        2.55,
+        3.8
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "bedroom_1_light",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "bedroom_1",
+      "position": [
+        2.7,
+        2.55,
+        7.8
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "bedroom_2_light",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "bedroom_2",
+      "position": [
+        9.2,
+        2.55,
+        7.8
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "office_light",
+      "type": "ceiling_light",
+      "discipline": "electrical",
+      "roomId": "office",
+      "position": [
+        13.1,
+        2.55,
+        7.8
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "ahu_1",
+      "type": "mechanical_equipment",
+      "discipline": "mechanical",
+      "roomId": "laundry",
+      "position": [
+        6.35,
+        0.72,
+        4.65
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "supply_garage",
+      "type": "ceiling_diffuser",
+      "discipline": "mechanical",
+      "roomId": "garage",
+      "position": [
+        2.7,
+        2.55,
+        3.7
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "supply_kitchen",
+      "type": "ceiling_diffuser",
+      "discipline": "mechanical",
+      "roomId": "kitchen",
+      "position": [
+        9.4,
+        2.55,
+        4.8
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "supply_living",
+      "type": "ceiling_diffuser",
+      "discipline": "mechanical",
+      "roomId": "living",
+      "position": [
+        13.2,
+        2.55,
+        3.5
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "supply_bedroom_1",
+      "type": "ceiling_diffuser",
+      "discipline": "mechanical",
+      "roomId": "bedroom_1",
+      "position": [
+        2.7,
+        2.55,
+        8.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "supply_bedroom_2",
+      "type": "ceiling_diffuser",
+      "discipline": "mechanical",
+      "roomId": "bedroom_2",
+      "position": [
+        9.2,
+        2.55,
+        8.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "supply_office",
+      "type": "ceiling_diffuser",
+      "discipline": "mechanical",
+      "roomId": "office",
+      "position": [
+        13.1,
+        2.55,
+        8.0
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    },
+    {
+      "id": "return_hall",
+      "type": "ceiling_return",
+      "discipline": "mechanical",
+      "roomId": "hall",
+      "position": [
+        6.35,
+        2.55,
+        6.5
+      ],
+      "geometryRole": "review_visualization",
+      "source": "procedural_asset_library_v1"
+    }
+  ],
+  "fixtureAssetStrategy": {
+    "spatialTruth": "PlanGraph coordinates and source dimensions",
+    "visualLayer": "procedural_asset_library_v1",
+    "futureGeneratedAssets": "Optional Tripo or curated GLB assets must remain non-authoritative presentation geometry"
+  },
+  "issues": [
+    {
+      "id": "BUI-1042",
+      "position": [
+        5.12,
+        0.72,
+        2.15
+      ],
+      "sheet": "E1.1",
+      "tone": "critical"
+    },
+    {
+      "id": "BUI-1038",
+      "position": [
+        11.2,
+        1.0,
+        7.1
+      ],
+      "sheet": "A1.1",
+      "tone": "warning"
+    },
+    {
+      "id": "RFI-017",
+      "position": [
+        7.05,
+        2.35,
+        6.5
+      ],
+      "sheet": "M1.1",
+      "tone": "info"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "template_version": "buili.project-record.v3",
+  "generated_at": "2026-07-12T17:25:00+00:00",
+  "reports": [
+    {
+      "id": "BUI-1042",
+      "kind": "evidence_package",
+      "title": "Garage GFCI receptacle below required elevation",
+      "status": "ready_for_review",
+      "pdf": "/demo/BUI-1042-issue-package.pdf",
+      "docx": "/demo/BUI-1042-issue-package.docx",
+      "sha256": "b8b778899519e526c9d66f71755d3f22bfa0d7d5e3c8c31c5c73b3a414515c21"
+    },
+    {
+      "id": "P-024",
+      "kind": "punch_item",
+      "title": "Raise garage GFCI rough-in before wall close-in",
+      "status": "open",
+      "pdf": "/demo/P-024-punch-item.pdf",
+      "docx": "/demo/P-024-punch-item.docx",
+      "sha256": "c0fe043b097da5907be8f392a4895310ecdd7d16a19c195bf61619700d474498"
+    },
+    {
+      "id": "RFI-018",
+      "kind": "rfi",
+      "title": "Office partition dimension conflict at grid C",
+      "status": "draft",
+      "pdf": "/demo/RFI-018-partition-dimension.pdf",
+      "docx": "/demo/RFI-018-partition-dimension.docx",
+      "sha256": "b5185316e6f561bc3d2fe3ae1dfe486a59ec7f73c156674cd7754d26ad816c1e"
+    },
+    {
+      "id": "RFI-017",
+      "kind": "rfi",
+      "title": "Return-air route at hall opening",
+      "status": "issued",
+      "pdf": "/demo/RFI-017-hvac-route.pdf",
+      "docx": "/demo/RFI-017-hvac-route.docx",
+      "sha256": "b229a7c1561c2c0582cc0638b0cc8c6a123130824d3a16ef7bcff0245c84e8b1"
+    },
+    {
+      "id": "CE-007",
+      "kind": "change_event",
+      "title": "Existing footing discovered below new laundry wall",
+      "status": "evidence_collecting",
+      "pdf": "/demo/CE-007-existing-footing.pdf",
+      "docx": "/demo/CE-007-existing-footing.docx",
+      "sha256": "233aeb37f2bb3206e82f5422e21e6fb3f37c9aec77a37fa31d6a9f07ae23fd82"
+    },
+    {
+      "id": "DR-2026-07-12",
+      "kind": "daily_report",
+      "title": "Daily field report - electrical rough-in",
+      "status": "complete",
+      "pdf": "/demo/DR-2026-07-12-daily-report.pdf",
+      "docx": "/demo/DR-2026-07-12-daily-report.docx",
+      "sha256": "23cfd064394169c70674232121d35ce1e5b804fc0283c5299f3cf78513e491ff"
+    }
+  ]
+}

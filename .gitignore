@@ -33,6 +33,8 @@ coverage/
 uploads/
 storage/
 tmp/
+output/generated_spatial/
+*.log
 plan_graph.json
 logs/
 *-qa.png

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ from ..models import (
     Project,
     Report,
     ReportArtifact,
+    User,
     new_id,
     utcnow,
 )
@@ -30,6 +31,7 @@ from .report_rendering import (
     render_docx,
     render_pdf,
     source_index,
+    validate_report_context,
 )
 from .storage import ObjectStorage
 
@@ -122,6 +124,7 @@ class ReportService:
 
     async def _report_context(
         self,
+        session: AsyncSession,
         *,
         report_id: str,
         version: int,
@@ -133,6 +136,7 @@ class ReportService:
         evidence_rows: list[Evidence],
         source_rows: list[tuple[IssueSource, DocumentRevision, Document]],
         generated_at: datetime,
+        generated_by: str,
     ) -> ReportContext:
         evidence: list[ReportEvidence] = []
         for item in evidence_rows:
@@ -169,6 +173,42 @@ class ReportService:
             )
             for index, (link, revision, document) in enumerate(source_rows, start=1)
         ]
+        report_fields = dict((issue.verification_json or {}).get("report_fields") or {})
+        people_ids = {
+            value
+            for value in (generated_by, issue.created_by, issue.assigned_to, issue.approved_by)
+            if value
+        }
+        people: dict[str, str] = {}
+        if people_ids:
+            people = {
+                user.id: user.display_name
+                for user in (
+                    await session.execute(select(User).where(User.id.in_(people_ids)))
+                ).scalars()
+            }
+
+        def field(name: str, fallback: str = "") -> str:
+            value = report_fields.get(name)
+            return str(value).strip() if value not in (None, "") else fallback
+
+        assignee = people.get(issue.assigned_to or "", "Project assignee")
+        preparer = people.get(generated_by, "BUILI project reviewer")
+        approver = people.get(issue.approved_by or "", "Project manager review required")
+        due_date = field("due_date", (generated_at + timedelta(days=7)).date().isoformat())
+        question = field(
+            "question",
+            f"Please confirm the governing requirement and direction for {issue.title.lower()}.",
+        )
+        required_action = field("required_action", issue.recommended_action.replace("_", " ").title())
+        completion_requirement = field(
+            "completion_requirement",
+            "Upload corrected-condition evidence at the same location and obtain reviewer acceptance.",
+        )
+        line_items = report_fields.get("line_items") if isinstance(report_fields.get("line_items"), list) else []
+        manpower = report_fields.get("manpower") if isinstance(report_fields.get("manpower"), list) else []
+        activity_log = report_fields.get("activity_log") if isinstance(report_fields.get("activity_log"), list) else []
+
         return ReportContext(
             report_id=report_id,
             version=version,
@@ -193,6 +233,29 @@ class ReportService:
             missing_evidence=list(issue.missing_evidence or []),
             evidence=evidence,
             sources=sources,
+            prepared_by=field("prepared_by", preparer),
+            responsible_party=field("responsible_party", assignee),
+            final_approver=field("final_approver", approver),
+            ball_in_court=field("ball_in_court", assignee),
+            due_date=due_date,
+            question=question,
+            suggested_answer=field("suggested_answer"),
+            official_response=field("official_response"),
+            cost_impact=field("cost_impact", "ROM pending commercial review"),
+            schedule_impact=field("schedule_impact", "Impact pending project-controls review"),
+            root_cause=field("root_cause", issue.classification.replace("_", " ").title()),
+            required_action=required_action,
+            completion_requirement=completion_requirement,
+            origin=field("origin", issue.number),
+            change_reason=field("change_reason", issue.classification.replace("_", " ").title()),
+            scope=field("scope", issue.difference or issue.description),
+            report_date=field("report_date", generated_at.date().isoformat()),
+            weather=field("weather", "Not recorded for this issue-based report"),
+            work_completed=field("work_completed", issue.observed_condition or issue.description),
+            safety_summary=field("safety_summary", "No safety event linked to this record"),
+            manpower=manpower,
+            line_items=line_items,
+            activity_log=activity_log,
         )
 
     async def _store_artifact(
@@ -261,6 +324,7 @@ class ReportService:
         generated_at = datetime.now(timezone.utc)
         status = "approved" if approve else "draft"
         context = await self._report_context(
+            session,
             report_id=report_id,
             version=version,
             status=status,
@@ -271,7 +335,16 @@ class ReportService:
             evidence_rows=evidence_rows,
             source_rows=source_rows,
             generated_at=generated_at,
+            generated_by=user_id,
         )
+        template_omissions = validate_report_context(context)
+        if approve and template_omissions:
+            raise AppError(
+                409,
+                "REPORT_TEMPLATE_INCOMPLETE",
+                "Report cannot be issued until its operational template fields are complete",
+                {"missing_fields": template_omissions, "kind": kind},
+            )
         pdf = render_pdf(context)
         docx = render_docx(context)
         report = Report(

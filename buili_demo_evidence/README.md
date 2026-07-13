@@ -17,7 +17,22 @@ if a reviewer finds a conflicting source or needs designer confirmation.
 copies the files into configured object storage and creates their database
 relationships. Production environments must keep demo seeding disabled.
 
-`BUI-1042-issue-package.pdf` and `BUI-1042-issue-package.docx` are regenerated
-from the same original BUILI production template with
-`scripts/generate_production_demo_report.py`; the editable and issued views
-therefore retain the same source index and review control.
+The persona includes a coordinated A1.1 architectural, E1.1 electrical, and
+M1.1 mechanical drawing set.  All sheets use the same calibrated metric
+coordinate system, but contain discipline-specific symbols, notes, fixtures,
+and PlanGraph objects.  `drawing-set.json` binds those sheets to the generated
+GLB review model and three spatial issue pins.
+
+`scripts/generate_production_demo_report.py` regenerates the complete report
+portfolio from the original BUILI production templates:
+
+- issue evidence package (PDF and DOCX)
+- punch item (PDF and DOCX)
+- RFI draft and issued RFI (PDF and DOCX)
+- change event evidence record (PDF and DOCX)
+- daily field report (PDF and DOCX)
+
+Each report family has its own operational field schema, blocks issuance when
+required data is missing, removes repeated narrative sections, and retains the
+same source index, evidence register, activity chronology, and review control
+between editable and PDF output.

@@ -544,6 +544,164 @@ def _write_glb(
     atomic_write_bytes(path, blob)
 
 
+def _write_segmented_glb(
+    path: Path,
+    parts: list[tuple[str, list[tuple[float, float, float]], list[int], int]],
+) -> None:
+    """Write review-friendly GLB parts with stable semantic mesh names.
+
+    Keeping floors, walls, and fixtures as separate primitives lets the web
+    viewer apply transparency, edge outlines, and selection without rebuilding
+    geometry client-side. The output remains deterministic and dependency-free.
+    """
+
+    populated = [part for part in parts if part[1] and part[2]]
+    if not populated:
+        populated = [
+            (
+                "Fallback geometry",
+                [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)],
+                [0, 1, 2],
+                0,
+            )
+        ]
+
+    binary = bytearray()
+    buffer_views: list[dict[str, Any]] = []
+    accessors: list[dict[str, Any]] = []
+    meshes: list[dict[str, Any]] = []
+    nodes: list[dict[str, Any]] = []
+
+    for mesh_index, (name, vertices, indices, material_index) in enumerate(populated):
+        positions = np.array(vertices, dtype=np.float32)
+        triangles = np.array(indices, dtype=np.uint32)
+
+        position_offset = len(binary)
+        position_bytes = positions.tobytes()
+        binary.extend(_pad4(position_bytes))
+        index_offset = len(binary)
+        index_bytes = triangles.tobytes()
+        binary.extend(_pad4(index_bytes))
+
+        position_view = len(buffer_views)
+        buffer_views.append(
+            {
+                "buffer": 0,
+                "byteOffset": position_offset,
+                "byteLength": len(position_bytes),
+                "target": 34962,
+            }
+        )
+        index_view = len(buffer_views)
+        buffer_views.append(
+            {
+                "buffer": 0,
+                "byteOffset": index_offset,
+                "byteLength": len(index_bytes),
+                "target": 34963,
+            }
+        )
+        position_accessor = len(accessors)
+        accessors.append(
+            {
+                "bufferView": position_view,
+                "componentType": 5126,
+                "count": len(vertices),
+                "type": "VEC3",
+                "min": positions.min(axis=0).round(5).tolist(),
+                "max": positions.max(axis=0).round(5).tolist(),
+            }
+        )
+        index_accessor = len(accessors)
+        accessors.append(
+            {
+                "bufferView": index_view,
+                "componentType": 5125,
+                "count": len(indices),
+                "type": "SCALAR",
+            }
+        )
+        meshes.append(
+            {
+                "name": name,
+                "primitives": [
+                    {
+                        "attributes": {"POSITION": position_accessor},
+                        "indices": index_accessor,
+                        "mode": 4,
+                        "material": material_index,
+                    }
+                ],
+                "extras": {"builiSemanticPart": name.lower().replace(" ", "_")},
+            }
+        )
+        nodes.append({"mesh": mesh_index, "name": name})
+
+    materials = [
+        {
+            "name": "Floor slab",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [0.92, 0.94, 0.93, 1.0],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.92,
+            },
+            "doubleSided": True,
+            "extensions": {"KHR_materials_unlit": {}},
+        },
+        {
+            "name": "Review walls",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [0.72, 0.78, 0.75, 0.58],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.7,
+            },
+            "alphaMode": "BLEND",
+            "doubleSided": True,
+            "extensions": {"KHR_materials_unlit": {}},
+        },
+        {
+            "name": "Discipline fixtures",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [0.69, 0.55, 0.32, 1.0],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.62,
+            },
+            "doubleSided": True,
+            "extensions": {"KHR_materials_unlit": {}},
+        },
+    ]
+    bin_blob = _pad4(bytes(binary))
+    gltf = {
+        "asset": {
+            "version": "2.0",
+            "generator": "BUILI SemanticScene deterministic review assembler",
+        },
+        "extensionsUsed": ["KHR_materials_unlit"],
+        "scene": 0,
+        "scenes": [{"nodes": list(range(len(nodes))), "name": "BUILI review scene"}],
+        "nodes": nodes,
+        "meshes": meshes,
+        "materials": materials,
+        "buffers": [{"byteLength": len(bin_blob)}],
+        "bufferViews": buffer_views,
+        "accessors": accessors,
+    }
+    json_blob = _pad4(json.dumps(gltf, separators=(",", ":")).encode("utf-8"), b" ")
+    total_length = 12 + 8 + len(json_blob) + 8 + len(bin_blob)
+    atomic_write_bytes(
+        path,
+        b"".join(
+            [
+                struct.pack("<4sII", b"glTF", 2, total_length),
+                struct.pack("<I4s", len(json_blob), b"JSON"),
+                json_blob,
+                struct.pack("<I4s", len(bin_blob), b"BIN\x00"),
+                bin_blob,
+            ]
+        ),
+    )
+
+
 def build_design_glb(
     graph: dict[str, Any],
     project_id: str,
@@ -555,11 +713,15 @@ def build_design_glb(
     validate_identifier(asset_id, label="asset_id")
     validated = validate_plan_graph_payload(graph)
     graph = validated.model_dump(mode="json", by_alias=True, exclude_none=True)
-    vertices: list[tuple[float, float, float]] = []
-    indices: list[int] = []
+    floor_vertices: list[tuple[float, float, float]] = []
+    floor_indices: list[int] = []
+    wall_vertices: list[tuple[float, float, float]] = []
+    wall_indices: list[int] = []
+    fixture_vertices: list[tuple[float, float, float]] = []
+    fixture_indices: list[int] = []
     floor_geometry = _floor_union(graph)
     floor_parts = _add_extruded_polygon(
-        vertices, indices, floor_geometry, bottom=-0.04, height=0.04
+        floor_vertices, floor_indices, floor_geometry, bottom=-0.04, height=0.04
     )
     openings_by_wall: dict[str, list[dict[str, Any]]] = {}
     for opening in graph.get("openings", []):
@@ -570,8 +732,8 @@ def build_design_glb(
     geometry_warnings: list[str] = []
     for wall in sorted(graph.get("walls", []), key=lambda row: str(row.get("id", ""))):
         cuts, warnings = _add_wall_with_openings(
-            vertices,
-            indices,
+            wall_vertices,
+            wall_indices,
             wall,
             openings_by_wall.get(str(wall.get("id") or ""), []),
         )
@@ -591,8 +753,8 @@ def build_design_glb(
             center = centers.get(room_id, (0.5, 0.5))
             offset = ((count % 4) - 1.5) * 0.35
         _add_fixture_proxy(
-            vertices,
-            indices,
+            fixture_vertices,
+            fixture_indices,
             (center[0] + offset, center[1] + math.floor(count / 4) * 0.25),
             str(fixture.get("type") or "fixture"),
         )
@@ -600,7 +762,18 @@ def build_design_glb(
     out_dir = _spatial_dir(project_id, storage_root=storage_root)
     filename = f"{asset_id}_design.glb"
     path = out_dir / filename
-    _write_glb(path, vertices, indices)
+    _write_segmented_glb(
+        path,
+        [
+            ("Floor slab", floor_vertices, floor_indices, 0),
+            ("Architectural walls", wall_vertices, wall_indices, 1),
+            ("Discipline fixtures", fixture_vertices, fixture_indices, 2),
+        ],
+    )
+    vertices = floor_vertices + wall_vertices + fixture_vertices
+    triangle_count = (
+        len(floor_indices) + len(wall_indices) + len(fixture_indices)
+    ) // 3
     uri = f"spatial/{project_id}/{filename}"
     metadata = {
         "format": "glb",
@@ -610,7 +783,8 @@ def build_design_glb(
         "openings": len(graph.get("openings", [])),
         "fixtures": len(graph.get("fixtures", [])),
         "vertex_count": len(vertices),
-        "triangle_count": len(indices) // 3,
+        "triangle_count": triangle_count,
+        "mesh_parts": ["floor", "walls", "fixtures"],
         "floor_polygon_parts": floor_parts,
         "wall_source_segments": len(graph.get("walls", [])),
         "wall_polygon_parts": len(graph.get("walls", [])),

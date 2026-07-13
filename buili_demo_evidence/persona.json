@@ -23,14 +23,37 @@
   },
   "documents": [
     {
+      "file": "cooper-residence-A1.1-demo.pdf",
+      "type": "DRAWING",
+      "sheet_number": "A1.1",
+      "revision": "03",
+      "status": "CURRENT_APPROVED",
+      "synthetic": true
+    },
+    {
       "file": "cooper-residence-E1.1-demo.pdf",
       "type": "DRAWING",
       "sheet_number": "E1.1",
-      "revision": "2",
+      "revision": "03",
+      "status": "CURRENT_APPROVED",
+      "synthetic": true
+    },
+    {
+      "file": "cooper-residence-M1.1-demo.pdf",
+      "type": "DRAWING",
+      "sheet_number": "M1.1",
+      "revision": "03",
       "status": "CURRENT_APPROVED",
       "synthetic": true
     }
   ],
+  "spatial_model": {
+    "file": "cooper-residence-coordinated-review.glb",
+    "plan_graph": "cooper-residence-coordinated-plan-graph.json",
+    "drawing_set": "drawing-set.json",
+    "coordinate_system": "BUILI-DEMO-METRIC-01",
+    "units": "meters"
+  },
   "issue": {
     "number": "BUI-1042",
     "title": "Garage GFCI receptacle below required elevation",
@@ -84,6 +107,36 @@
       "file": "BUI-1042-issue-package.docx",
       "type": "EDITABLE_ISSUE_PACKAGE",
       "status": "READY_FOR_REVIEW",
+      "synthetic": true
+    },
+    {
+      "file": "P-024-punch-item.pdf",
+      "type": "PUNCH_ITEM",
+      "status": "READY_FOR_REVIEW",
+      "synthetic": true
+    },
+    {
+      "file": "RFI-018-partition-dimension.pdf",
+      "type": "RFI_DRAFT",
+      "status": "DRAFT",
+      "synthetic": true
+    },
+    {
+      "file": "RFI-017-hvac-route.pdf",
+      "type": "RFI",
+      "status": "ISSUED",
+      "synthetic": true
+    },
+    {
+      "file": "CE-007-existing-footing.pdf",
+      "type": "CHANGE_EVENT",
+      "status": "EVIDENCE_COLLECTING",
+      "synthetic": true
+    },
+    {
+      "file": "DR-2026-07-12-daily-report.pdf",
+      "type": "DAILY_REPORT",
+      "status": "COMPLETE",
       "synthetic": true
     }
   ]

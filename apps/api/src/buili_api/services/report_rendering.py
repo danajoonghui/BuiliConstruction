@@ -44,7 +44,7 @@ from reportlab.platypus import (  # type: ignore[import-untyped]
 from reportlab.pdfgen import canvas as pdf_canvas  # type: ignore[import-untyped]
 
 
-TEMPLATE_VERSION = "buili.issue-pack.v2"
+TEMPLATE_VERSION = "buili.project-record.v3"
 GREEN = "#50C878"
 GREEN_DARK = "#167A47"
 INK = "#17211B"
@@ -123,6 +123,104 @@ class ReportContext:
     missing_evidence: list[str] = field(default_factory=list)
     evidence: list[ReportEvidence] = field(default_factory=list)
     sources: list[ReportSource] = field(default_factory=list)
+    prepared_by: str = ""
+    responsible_party: str = ""
+    final_approver: str = ""
+    ball_in_court: str = ""
+    due_date: str = ""
+    question: str = ""
+    suggested_answer: str = ""
+    official_response: str = ""
+    cost_impact: str = ""
+    schedule_impact: str = ""
+    root_cause: str = ""
+    required_action: str = ""
+    completion_requirement: str = ""
+    origin: str = ""
+    change_reason: str = ""
+    scope: str = ""
+    report_date: str = ""
+    weather: str = ""
+    work_completed: str = ""
+    safety_summary: str = ""
+    manpower: list[dict[str, Any]] = field(default_factory=list)
+    line_items: list[dict[str, Any]] = field(default_factory=list)
+    activity_log: list[dict[str, Any]] = field(default_factory=list)
+
+
+REPORT_TEMPLATE_SCHEMAS: dict[str, dict[str, tuple[str, ...]]] = {
+    "evidence_package": {"required": ("observed_condition", "expected_condition", "difference")},
+    "issue_detail": {"required": ("observed_condition", "expected_condition", "difference")},
+    "punch": {"required": ("responsible_party", "due_date", "required_action", "completion_requirement")},
+    "punch_item": {"required": ("responsible_party", "due_date", "required_action", "completion_requirement")},
+    "rfi": {"required": ("ball_in_court", "due_date", "question")},
+    "change_event": {"required": ("origin", "change_reason", "scope", "cost_impact", "schedule_impact")},
+    "daily_report": {"required": ("report_date", "weather", "work_completed", "safety_summary")},
+}
+
+
+def validate_report_context(context: ReportContext) -> list[str]:
+    """Return blocking template omissions before a report can be issued."""
+
+    schema = REPORT_TEMPLATE_SCHEMAS.get(context.kind, REPORT_TEMPLATE_SCHEMAS["issue_detail"])
+    missing = [name for name in schema["required"] if not _plain(getattr(context, name, ""), fallback="")]
+    if not context.sources and context.kind != "daily_report":
+        missing.append("sources")
+    if context.evidence_sufficiency.lower() == "insufficient" and not context.missing_evidence:
+        missing.append("missing_evidence")
+    return missing
+
+
+def report_sections(context: ReportContext) -> list[tuple[str, str]]:
+    """Build non-repeating narrative sections for the selected operational form."""
+
+    kind = context.kind
+    if kind in {"punch", "punch_item"}:
+        candidates = [
+            ("Deficiency", context.observed_condition),
+            ("Contract requirement", context.expected_condition),
+            ("Required correction", context.required_action or context.recommended_action),
+            ("Completion proof", context.completion_requirement),
+        ]
+    elif kind == "rfi":
+        candidates = [
+            ("Existing condition", context.observed_condition),
+            ("Contract-document conflict", context.difference),
+            ("Question", context.question),
+            ("Suggested answer - for review", context.suggested_answer),
+            ("Official response", context.official_response),
+        ]
+    elif kind == "change_event":
+        candidates = [
+            ("Original scope", context.expected_condition),
+            ("Changed condition", context.observed_condition),
+            ("Basis of change", context.difference),
+            ("Commercial position", context.scope),
+        ]
+    elif kind == "daily_report":
+        candidates = [
+            ("Work completed", context.work_completed),
+            ("Weather and site conditions", context.weather),
+            ("Safety and inspections", context.safety_summary),
+            ("Open field observation", context.observed_condition),
+        ]
+    else:
+        candidates = [
+            ("Observed condition", context.observed_condition),
+            ("Required / expected condition", context.expected_condition),
+            ("Verified difference", context.difference),
+            ("Recommended route", context.required_action or context.recommended_action),
+        ]
+    seen: set[str] = set()
+    output: list[tuple[str, str]] = []
+    for heading, body in candidates:
+        plain = _plain(body, fallback="")
+        key = re.sub(r"\W+", "", plain).lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        output.append((heading, plain))
+    return output
 
 
 def _plain(value: Any, *, fallback: str = "Not recorded") -> str:
@@ -233,6 +331,98 @@ def _pdf_table(data, widths, *, header: bool = False, accent: bool = False) -> T
     return table
 
 
+def _operational_facts(context: ReportContext) -> list[tuple[str, str]]:
+    if context.kind in {"punch", "punch_item"}:
+        return [
+            ("Responsible trade", context.responsible_party),
+            ("Punch manager", context.prepared_by),
+            ("Final approver", context.final_approver),
+            ("Due date", context.due_date),
+        ]
+    if context.kind == "rfi":
+        return [
+            ("Ball in court", context.ball_in_court),
+            ("Due date", context.due_date),
+            ("Cost impact", context.cost_impact or "To be determined"),
+            ("Schedule impact", context.schedule_impact or "To be determined"),
+        ]
+    if context.kind == "change_event":
+        return [
+            ("Origin", context.origin),
+            ("Change reason", context.change_reason),
+            ("Scope", context.scope),
+            ("Prepared by", context.prepared_by),
+        ]
+    if context.kind == "daily_report":
+        return [
+            ("Report date", context.report_date),
+            ("Prepared by", context.prepared_by),
+            ("Weather", context.weather),
+            ("Safety", context.safety_summary),
+        ]
+    return [
+        ("Priority", _label(context.priority)),
+        ("Classification", _label(context.classification)),
+        ("Evidence", _label(context.evidence_sufficiency)),
+        ("Issue status", _label(context.issue_status)),
+    ]
+
+
+def _pdf_operational_record(context: ReportContext, styles: dict[str, ParagraphStyle]) -> list[Any]:
+    facts = _operational_facts(context)
+    rows = [
+        [Paragraph(_pdf_plain(label.upper()), styles["label"]) for label, _ in facts],
+        [Paragraph(_pdf_plain(value), styles["body"]) for _, value in facts],
+    ]
+    flowables: list[Any] = [_pdf_table(rows, [1.6 * inch] * 4, accent=True)]
+    for heading, body in report_sections(context):
+        flowables.extend(
+            [
+                Paragraph(_pdf_plain(heading), styles["h2"]),
+                _pdf_table([[Paragraph(_pdf_plain(body), styles["body"])]], [6.4 * inch], accent=heading in {"Required correction", "Question", "Commercial position"}),
+            ]
+        )
+    if context.kind == "change_event" and context.line_items:
+        flowables.append(Paragraph("Cost and production line items", styles["h2"]))
+        item_rows = [[Paragraph(value, styles["label"]) for value in ("COST CODE", "DESCRIPTION", "QTY / UOM", "ROM")]]
+        for item in context.line_items:
+            item_rows.append(
+                [
+                    Paragraph(_pdf_plain(item.get("cost_code")), styles["small"]),
+                    Paragraph(_pdf_plain(item.get("description")), styles["small"]),
+                    Paragraph(_pdf_plain(f"{item.get('quantity', '-')} {item.get('unit', '')}"), styles["small"]),
+                    Paragraph(_pdf_plain(item.get("rom")), styles["small"]),
+                ]
+            )
+        flowables.append(_pdf_table(item_rows, [1.05 * inch, 3.2 * inch, 0.95 * inch, 1.2 * inch], header=True))
+    if context.kind == "daily_report" and context.manpower:
+        flowables.append(Paragraph("Manpower", styles["h2"]))
+        manpower_rows = [[Paragraph(value, styles["label"]) for value in ("COMPANY", "TRADE", "WORKERS", "HOURS")]]
+        for item in context.manpower:
+            manpower_rows.append(
+                [
+                    Paragraph(_pdf_plain(item.get("company")), styles["small"]),
+                    Paragraph(_pdf_plain(item.get("trade")), styles["small"]),
+                    Paragraph(_pdf_plain(item.get("workers")), styles["small"]),
+                    Paragraph(_pdf_plain(item.get("hours")), styles["small"]),
+                ]
+            )
+        flowables.append(_pdf_table(manpower_rows, [2.2 * inch, 1.9 * inch, 1.1 * inch, 1.2 * inch], header=True))
+    if context.activity_log:
+        flowables.append(Paragraph("Activity and chronology", styles["h2"]))
+        activity_rows = [[Paragraph("TIME", styles["label"]), Paragraph("ACTOR", styles["label"]), Paragraph("EVENT", styles["label"])]]
+        for event in context.activity_log:
+            activity_rows.append(
+                [
+                    Paragraph(_pdf_plain(event.get("timestamp")), styles["small"]),
+                    Paragraph(_pdf_plain(event.get("actor")), styles["small"]),
+                    Paragraph(_pdf_plain(event.get("event")), styles["small"]),
+                ]
+            )
+        flowables.append(_pdf_table(activity_rows, [1.25 * inch, 1.25 * inch, 3.9 * inch], header=True))
+    return flowables
+
+
 def render_pdf(context: ReportContext) -> bytes:
     """Render a Letter-size, source-cited BUILI issue package."""
 
@@ -287,31 +477,8 @@ def render_pdf(context: ReportContext) -> bytes:
         ),
         Spacer(1, 0.16 * inch),
     ]
-    facts = [
-        [Paragraph("PRIORITY", styles["label"]), Paragraph("CLASSIFICATION", styles["label"]), Paragraph("EVIDENCE", styles["label"]), Paragraph("ISSUE STATUS", styles["label"])],
-        [Paragraph(_pdf_plain(_label(context.priority)), styles["body"]), Paragraph(_pdf_plain(_label(context.classification)), styles["body"]), Paragraph(_pdf_plain(_label(context.evidence_sufficiency)), styles["body"]), Paragraph(_pdf_plain(_label(context.issue_status)), styles["body"])],
-    ]
-    story.append(_pdf_table(facts, [1.18 * inch, 2.2 * inch, 1.42 * inch, 1.6 * inch], accent=True))
-    story.extend(
-        [
-            Paragraph("Verification finding", styles["h2"]),
-            _pdf_table(
-                [
-                    [Paragraph("OBSERVED", styles["label"]), Paragraph("REQUIRED / EXPECTED", styles["label"]), Paragraph("DIFFERENCE", styles["label"])],
-                    [Paragraph(_pdf_plain(context.observed_condition), styles["body"]), Paragraph(_pdf_plain(context.expected_condition), styles["body"]), Paragraph(_pdf_plain(context.difference), styles["body"])],
-                ],
-                [2.04 * inch, 2.18 * inch, 2.18 * inch],
-                header=True,
-            ),
-            Paragraph("Recommended route", styles["h2"]),
-            _pdf_table(
-                [[Paragraph(_pdf_plain(_label(context.recommended_action)), styles["eyebrow"]), Paragraph(_pdf_plain(context.difference, fallback="Reviewer confirmation is required before official issue."), styles["body"])]],
-                [1.7 * inch, 4.7 * inch],
-                accent=True,
-            ),
-            Paragraph("Evidence register", styles["h2"]),
-        ]
-    )
+    story.extend(_pdf_operational_record(context, styles))
+    story.append(Paragraph("Evidence register", styles["h2"]))
     evidence_rows = [[Paragraph("TYPE", styles["label"]), Paragraph("EVIDENCE", styles["label"]), Paragraph("LOCATION / CAPTURE", styles["label"])]]
     for evidence_item in context.evidence:
         details = _pdf_plain(
@@ -541,6 +708,58 @@ def _word_table(document, headers: list[str], rows: list[list[str]], widths: lis
     return table
 
 
+def _word_operational_record(document, context: ReportContext) -> None:
+    facts = _operational_facts(context)
+    _word_table(
+        document,
+        [label for label, _ in facts],
+        [[value for _, value in facts]],
+        [2340, 2340, 2340, 2340],
+        accent=True,
+    )
+    for heading, body in report_sections(context):
+        document.add_heading(heading, level=2)
+        _word_table(document, [heading], [[body]], [9360], accent=heading in {"Required correction", "Question", "Commercial position"})
+    if context.kind == "change_event" and context.line_items:
+        document.add_heading("Cost and production line items", level=2)
+        _word_table(
+            document,
+            ["Cost code", "Description", "Qty / UOM", "ROM"],
+            [[
+                _plain(item.get("cost_code")),
+                _plain(item.get("description")),
+                _plain(f"{item.get('quantity', '-')} {item.get('unit', '')}"),
+                _plain(item.get("rom")),
+            ] for item in context.line_items],
+            [1500, 4500, 1500, 1860],
+        )
+    if context.kind == "daily_report" and context.manpower:
+        document.add_heading("Manpower", level=2)
+        _word_table(
+            document,
+            ["Company", "Trade", "Workers", "Hours"],
+            [[
+                _plain(item.get("company")),
+                _plain(item.get("trade")),
+                _plain(item.get("workers")),
+                _plain(item.get("hours")),
+            ] for item in context.manpower],
+            [3000, 2700, 1500, 2160],
+        )
+    if context.activity_log:
+        document.add_heading("Activity and chronology", level=2)
+        _word_table(
+            document,
+            ["Time", "Actor", "Event"],
+            [[
+                _plain(item.get("timestamp")),
+                _plain(item.get("actor")),
+                _plain(item.get("event")),
+            ] for item in context.activity_log],
+            [1900, 2000, 5460],
+        )
+
+
 def _word_paragraph(document, text: str, *, size: float = 10.5, color: str = INK, bold: bool = False, before: float = 0, after: float = 6, align=WD_ALIGN_PARAGRAPH.LEFT):
     paragraph = document.add_paragraph()
     paragraph.alignment = align
@@ -651,29 +870,7 @@ def render_docx(context: ReportContext) -> bytes:
     _word_paragraph(document, _label(context.kind), size=8.5, color=GREEN_DARK, bold=True, after=3)
     _word_paragraph(document, context.title, size=26, bold=True, after=5)
     _word_paragraph(document, f"{context.project_name} / {context.project_code} / {context.issue_number}", size=10, color=MUTED, after=18)
-    _word_table(
-        document,
-        ["Priority", "Classification", "Evidence", "Control"],
-        [[_label(context.priority), _label(context.classification), _label(context.evidence_sufficiency), "APPROVED" if context.status == "approved" else "DRAFT"]],
-        [1400, 3000, 2200, 2760],
-        accent=True,
-    )
-
-    document.add_heading("Verification finding", level=1)
-    _word_table(
-        document,
-        ["Observed", "Required / expected", "Difference"],
-        [[context.observed_condition, context.expected_condition, context.difference]],
-        [2940, 3210, 3210],
-    )
-    document.add_heading("Recommended route", level=2)
-    _word_table(
-        document,
-        ["Route", "Reviewer note"],
-        [[_label(context.recommended_action), context.difference]],
-        [2400, 6960],
-        accent=True,
-    )
+    _word_operational_record(document, context)
     document.add_heading("Evidence register", level=1)
     evidence_rows = [
         [

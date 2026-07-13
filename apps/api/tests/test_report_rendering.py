@@ -18,7 +18,9 @@ from buili_api.services.report_rendering import (
     ReportSource,
     render_docx,
     render_pdf,
+    report_sections,
     source_index,
+    validate_report_context,
 )
 
 
@@ -126,7 +128,7 @@ def test_report_bytes_and_source_manifest_are_reproducible() -> None:
     assert PdfReader(io.BytesIO(first_pdf)).metadata.creation_date == datetime(
         2026, 7, 12, 17, 25, tzinfo=timezone.utc
     )
-    assert TEMPLATE_VERSION == "buili.issue-pack.v2"
+    assert TEMPLATE_VERSION == "buili.project-record.v3"
     assert source_index(context) == [
         {
             "index": 1,
@@ -173,3 +175,20 @@ def test_untrusted_record_text_is_escaped_in_pdf_markup() -> None:
     assert "Measured A < B & C > D." in rendered
     assert "Photo <1> & measurement" in rendered
     assert "Use A&B; do not treat <tag> as markup." in rendered
+
+
+def test_operational_templates_validate_required_fields_and_remove_duplicate_sections() -> None:
+    context = _context("rfi")
+    assert validate_report_context(context) == ["ball_in_court", "due_date", "question"]
+    context.ball_in_court = "Design architect"
+    context.due_date = "2026-07-16"
+    context.question = context.difference
+    context.suggested_answer = "Confirm grid-based layout."
+
+    assert validate_report_context(context) == []
+    sections = report_sections(context)
+    assert [heading for heading, _ in sections] == [
+        "Existing condition",
+        "Contract-document conflict",
+        "Suggested answer - for review",
+    ]

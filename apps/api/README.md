@@ -92,9 +92,11 @@ document revision/hash. Blocking parser errors cannot be approved. Low-confidenc
 only advance through `/v1/spatial-scenes/{id}/review`, which creates a new attested/locked version
 instead of mutating generated geometry.
 
-Report exports use the original `buili.issue-pack.v2` template and create immutable PDF,
-DOCX, and JSON manifest artifacts under one report version. Each artifact has a SHA-256
-digest and a tenant-scoped storage record; the report includes an exact source index.
+Report exports use the original `buili.project-record.v3` template family and create immutable
+PDF, DOCX, and JSON manifest artifacts under one report version. Punch, RFI, change-event,
+daily-report, and evidence-package outputs each enforce their own operational fields without
+repeating the same narrative under multiple headings. Each artifact has a SHA-256 digest and a
+tenant-scoped storage record; the report includes an exact source index.
 Drafts require an issue that is ready for review. Approval creates a new version and is
 blocked unless the issue itself is approved, evidence is sufficient, and its approved
 source hashes still match the latest verification run.

@@ -201,7 +201,8 @@ async def test_document_evidence_issue_report_and_rag(client, account):
     assert zipfile.is_zipfile(io.BytesIO(docx_response.content))
     editable = WordDocument(io.BytesIO(docx_response.content))
     editable_text = "\n".join(paragraph.text for paragraph in editable.paragraphs)
-    assert "Verification finding" in editable_text
+    assert "Deficiency" in editable_text
+    assert "Required correction" in editable_text
     assert "Source index" in editable_text
     assert len(editable.tables) >= 5
     assert len(editable.inline_shapes) == 1

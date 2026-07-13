@@ -9,12 +9,13 @@ function renderReports(){return render(<DemoModeProvider demo organizationId="or
 describe('demo report workspace',()=>{
   beforeEach(()=>vi.stubGlobal('print',vi.fn()));
 
-  it('switches reports without presenting an unbundled artifact as complete',()=>{
+  it('switches reports and exposes bundled PDF and DOCX artifacts',()=>{
     renderReports();
     fireEvent.click(screen.getByRole('button',{name:/RFI draft \/ RFI-018/i}));
-    expect(screen.getByRole('heading',{name:'Partition dimension conflict'})).toBeInTheDocument();
-    expect(screen.getByText(/Only P-024 includes a bundled source-cited artifact/)).toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'PDF'})).toBeDisabled();
+    expect(screen.getByRole('heading',{name:'Office partition dimension conflict at grid C'})).toBeInTheDocument();
+    expect(screen.getByRole('link',{name:'PDF'})).toHaveAttribute('href','/demo/RFI-018-partition-dimension.pdf');
+    expect(screen.getByRole('link',{name:'DOCX'})).toHaveAttribute('href','/demo/RFI-018-partition-dimension.docx');
+    expect(screen.getByText('Please confirm the controlling reference and approved offset from grid C.')).toBeInTheDocument();
   });
 
   it('saves and approves the bundled demo report with explicit local-only feedback',()=>{

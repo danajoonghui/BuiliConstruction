@@ -1,0 +1,986 @@
+{
+  "schema_version": "buili.plan-graph.v2",
+  "project_id": "cooper_demo",
+  "sheet_id": "E1.1",
+  "scale": {
+    "px_per_meter": 46.0,
+    "source": "coordinated_demo_cad",
+    "confidence": 0.99
+  },
+  "rooms": [
+    {
+      "id": "bath",
+      "name": "Bath",
+      "polygon": [
+        [
+          5.4,
+          7.2
+        ],
+        [
+          7.3,
+          7.2
+        ],
+        [
+          7.3,
+          10.0
+        ],
+        [
+          5.4,
+          10.0
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "bedroom_1",
+      "name": "Bedroom 1",
+      "polygon": [
+        [
+          0.0,
+          5.8
+        ],
+        [
+          5.4,
+          5.8
+        ],
+        [
+          5.4,
+          10.0
+        ],
+        [
+          0.0,
+          10.0
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "bedroom_2",
+      "name": "Bedroom 2",
+      "polygon": [
+        [
+          7.3,
+          5.8
+        ],
+        [
+          11.2,
+          5.8
+        ],
+        [
+          11.2,
+          10.0
+        ],
+        [
+          7.3,
+          10.0
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "entry",
+      "name": "Entry",
+      "polygon": [
+        [
+          5.4,
+          0.0
+        ],
+        [
+          7.3,
+          0.0
+        ],
+        [
+          7.3,
+          2.4
+        ],
+        [
+          5.4,
+          2.4
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "garage",
+      "name": "Garage",
+      "polygon": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          5.4,
+          0.0
+        ],
+        [
+          5.4,
+          5.8
+        ],
+        [
+          0.0,
+          5.8
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "hall",
+      "name": "Hall",
+      "polygon": [
+        [
+          5.4,
+          5.8
+        ],
+        [
+          7.3,
+          5.8
+        ],
+        [
+          7.3,
+          7.2
+        ],
+        [
+          5.4,
+          7.2
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen",
+      "polygon": [
+        [
+          7.3,
+          2.4
+        ],
+        [
+          11.4,
+          2.4
+        ],
+        [
+          11.4,
+          5.8
+        ],
+        [
+          7.3,
+          5.8
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "laundry",
+      "name": "Laundry",
+      "polygon": [
+        [
+          5.4,
+          2.4
+        ],
+        [
+          7.3,
+          2.4
+        ],
+        [
+          7.3,
+          5.8
+        ],
+        [
+          5.4,
+          5.8
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "living",
+      "name": "Living Room",
+      "polygon": [
+        [
+          11.4,
+          0.0
+        ],
+        [
+          15.0,
+          0.0
+        ],
+        [
+          15.0,
+          5.8
+        ],
+        [
+          11.4,
+          5.8
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "office",
+      "name": "Office",
+      "polygon": [
+        [
+          11.2,
+          5.8
+        ],
+        [
+          15.0,
+          5.8
+        ],
+        [
+          15.0,
+          10.0
+        ],
+        [
+          11.2,
+          10.0
+        ]
+      ],
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    }
+  ],
+  "walls": [
+    {
+      "id": "w_east",
+      "room_id": "",
+      "from": [
+        15.0,
+        0.0
+      ],
+      "to": [
+        15.0,
+        10.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.22,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_h1",
+      "room_id": "",
+      "from": [
+        0.0,
+        5.8
+      ],
+      "to": [
+        15.0,
+        5.8
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_h2",
+      "room_id": "",
+      "from": [
+        5.4,
+        2.4
+      ],
+      "to": [
+        11.4,
+        2.4
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_h3",
+      "room_id": "",
+      "from": [
+        5.4,
+        7.2
+      ],
+      "to": [
+        7.3,
+        7.2
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_north",
+      "room_id": "",
+      "from": [
+        15.0,
+        10.0
+      ],
+      "to": [
+        0.0,
+        10.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.22,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_south",
+      "room_id": "",
+      "from": [
+        0.0,
+        0.0
+      ],
+      "to": [
+        15.0,
+        0.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.22,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_v1",
+      "room_id": "",
+      "from": [
+        5.4,
+        0.0
+      ],
+      "to": [
+        5.4,
+        10.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_v2",
+      "room_id": "",
+      "from": [
+        7.3,
+        0.0
+      ],
+      "to": [
+        7.3,
+        10.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_v3_n",
+      "room_id": "",
+      "from": [
+        11.2,
+        5.8
+      ],
+      "to": [
+        11.2,
+        10.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_v3_s",
+      "room_id": "",
+      "from": [
+        11.4,
+        0.0
+      ],
+      "to": [
+        11.4,
+        5.8
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.13,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "id": "w_west",
+      "room_id": "",
+      "from": [
+        0.0,
+        10.0
+      ],
+      "to": [
+        0.0,
+        0.0
+      ],
+      "height_m": 2.8,
+      "thickness_m": 0.22,
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    }
+  ],
+  "openings": [
+    {
+      "type": "door",
+      "wall_id": "w_east",
+      "center_m": [
+        15.0,
+        2.9
+      ],
+      "width_m": 2.2,
+      "height_m": 2.2,
+      "sill_height_m": 0.0,
+      "source_entity_id": "living_slider",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_h1",
+      "center_m": [
+        4.4,
+        5.8
+      ],
+      "width_m": 0.9,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "bedroom_1_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_h1",
+      "center_m": [
+        8.2,
+        5.8
+      ],
+      "width_m": 0.9,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "bedroom_2_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_h3",
+      "center_m": [
+        6.35,
+        7.2
+      ],
+      "width_m": 0.8,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "bath_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "window",
+      "wall_id": "w_north",
+      "center_m": [
+        6.35,
+        10.0
+      ],
+      "width_m": 0.9,
+      "height_m": 0.8,
+      "sill_height_m": 1.3,
+      "source_entity_id": "bath_window",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "window",
+      "wall_id": "w_north",
+      "center_m": [
+        9.2,
+        10.0
+      ],
+      "width_m": 1.6,
+      "height_m": 1.25,
+      "sill_height_m": 0.9,
+      "source_entity_id": "bedroom_2_window",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "window",
+      "wall_id": "w_north",
+      "center_m": [
+        2.7,
+        10.0
+      ],
+      "width_m": 1.8,
+      "height_m": 1.25,
+      "sill_height_m": 0.9,
+      "source_entity_id": "bedroom_window",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "window",
+      "wall_id": "w_north",
+      "center_m": [
+        13.0,
+        10.0
+      ],
+      "width_m": 1.6,
+      "height_m": 1.25,
+      "sill_height_m": 0.9,
+      "source_entity_id": "office_window",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_south",
+      "center_m": [
+        6.35,
+        0.0
+      ],
+      "width_m": 0.95,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "entry_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_south",
+      "center_m": [
+        2.7,
+        0.0
+      ],
+      "width_m": 4.2,
+      "height_m": 2.35,
+      "sill_height_m": 0.0,
+      "source_entity_id": "garage_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_v1",
+      "center_m": [
+        5.4,
+        1.35
+      ],
+      "width_m": 0.9,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "garage_to_entry",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_v1",
+      "center_m": [
+        5.4,
+        4.4
+      ],
+      "width_m": 0.82,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "laundry_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_v2",
+      "center_m": [
+        7.3,
+        6.5
+      ],
+      "width_m": 0.9,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "hall_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_v2",
+      "center_m": [
+        7.3,
+        4.0
+      ],
+      "width_m": 1.4,
+      "height_m": 2.4,
+      "sill_height_m": 0.0,
+      "source_entity_id": "kitchen_opening",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_v3_n",
+      "center_m": [
+        11.2,
+        6.7
+      ],
+      "width_m": 0.9,
+      "height_m": 2.1,
+      "sill_height_m": 0.0,
+      "source_entity_id": "office_door",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "door",
+      "wall_id": "w_v3_s",
+      "center_m": [
+        11.4,
+        3.8
+      ],
+      "width_m": 1.8,
+      "height_m": 2.4,
+      "sill_height_m": 0.0,
+      "source_entity_id": "living_opening",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "type": "ceiling_light",
+      "room_id": "bedroom_1",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        2.7,
+        7.8
+      ],
+      "source_entity_id": "bedroom_1_light",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "bedroom_2",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        9.2,
+        7.8
+      ],
+      "source_entity_id": "bedroom_2_light",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "entry",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        6.35,
+        1.25
+      ],
+      "source_entity_id": "entry_light",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "garage",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        1.8,
+        2.0
+      ],
+      "source_entity_id": "garage_light_1",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "garage",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        3.7,
+        2.0
+      ],
+      "source_entity_id": "garage_light_2",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "electrical_panel",
+      "room_id": "garage",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        0.45,
+        3.2
+      ],
+      "source_entity_id": "panel_ep1",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "receptacle",
+      "room_id": "garage",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        5.18,
+        2.15
+      ],
+      "source_entity_id": "gfci_issue",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "kitchen",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        8.5,
+        4.0
+      ],
+      "source_entity_id": "kitchen_light_1",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "kitchen",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        10.2,
+        4.0
+      ],
+      "source_entity_id": "kitchen_light_2",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "living",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        12.5,
+        2.5
+      ],
+      "source_entity_id": "living_light_1",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "living",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        14.0,
+        3.8
+      ],
+      "source_entity_id": "living_light_2",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    },
+    {
+      "type": "ceiling_light",
+      "room_id": "office",
+      "wall_id": "",
+      "required_count": 1,
+      "observed_count": 0,
+      "bbox": [],
+      "center_m": [
+        13.1,
+        7.8
+      ],
+      "source_entity_id": "office_light",
+      "confidence": 0.99,
+      "source_ref_ids": [
+        "src_1a884ac5038338fac4050bba"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "source_ref_id": "src_1a884ac5038338fac4050bba",
+      "citation_chunk_id": "",
+      "doc_id": "doc_e1_1",
+      "sheet_id": "E1.1",
+      "page": 1,
+      "bbox": [
+        0.0,
+        0.0,
+        15.0,
+        10.0
+      ],
+      "source_type": "coordinated_cad_plan",
+      "source_strength": "strong",
+      "revision": "03",
+      "source_hash": "85dceb1e6df4016fed87d520fd9c22a6049e351927123c6b587d697310a77fda"
+    }
+  ],
+  "extraction": {
+    "method": "coordinated_demo_cad_to_plan_graph_v1",
+    "source_doc_id": "doc_e1_1"
+  },
+  "provenance": {
+    "source_doc_id": "doc_e1_1",
+    "source_hash": "85dceb1e6df4016fed87d520fd9c22a6049e351927123c6b587d697310a77fda",
+    "source_revision": "03",
+    "source_revision_id": "rev_e1_1_03",
+    "source_revision_state": "current",
+    "source_issue_date": "2026-07-11",
+    "source_filename": "cooper-residence-E1.1-demo.pdf"
+  },
+  "confidence": {
+    "overall": 0.7952,
+    "geometry": 0.5237,
+    "semantics": 0.9,
+    "scale": 0.99,
+    "traceability": 1.0,
+    "method": "deterministic_weighted_quality_gates",
+    "review_required": true
+  },
+  "warnings": [],
+  "pipeline": {
+    "contract_version": "buili.plan-graph.v2",
+    "pipeline_version": "2026.07.1",
+    "deterministic": true,
+    "source_fingerprint": "2d390c9b396e49ef38e89e35a1202d76f2a9ce867d64c225f1e193b325bab55b",
+    "run_id": "spatial_7d80fb9c9a075df4a5741caa",
+    "content_sha256": "9cbe0066b83a25cae2b3da7670a91fc33fe6c3c895883cbe79cf487918b20b42"
+  }
+}
