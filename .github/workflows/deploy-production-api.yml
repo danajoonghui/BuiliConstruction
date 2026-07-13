@@ -26,7 +26,7 @@ jobs:
       TF_VAR_tripo_enabled: ${{ vars.TRIPO_ENABLED || 'false' }}
       TF_VAR_tripo_model_version: ${{ vars.TRIPO_MODEL_VERSION || 'P1-20260311' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
