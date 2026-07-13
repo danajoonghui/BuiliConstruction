@@ -257,6 +257,11 @@ export function ThreeSpatialScene({
   return (
     <div className={`three-spatial-root ${failed ? 'three-spatial-root--failed' : ''}`} ref={mountRef}>
       <div className="three-scene-status">{status}</div>
+      <div className="three-scene-legend" aria-label="Model object legend">
+        <span><i className="three-scene-key three-scene-key--architectural" />Architectural fixtures</span>
+        <span><i className="three-scene-key three-scene-key--electrical" />Electrical devices</span>
+        <span><i className="three-scene-key three-scene-key--mechanical" />Mechanical equipment</span>
+      </div>
     </div>
   );
 }
